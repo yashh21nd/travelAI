@@ -14,6 +14,22 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Root endpoint - Health check
+app.get('/', (req, res) => {
+  res.json({
+    message: '🌍 TravelAI Backend API is running!',
+    status: 'healthy',
+    version: '1.0.0',
+    endpoints: {
+      plan: '/api/plan',
+      sendItinerary: '/api/send-itinerary',
+      accommodations: '/api/accommodations',
+      places: '/api/places/:destination'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Professional accommodation price comparison API with real hotel data
 async function getAccommodationPrices(destination, checkIn, checkOut, guests, currency, tripDuration) {
   // Date validation - check if accommodation dates match trip duration

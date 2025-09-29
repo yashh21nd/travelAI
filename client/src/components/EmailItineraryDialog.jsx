@@ -24,30 +24,17 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
     setError('');
 
     try {
-      let response;
-      try {
-        // Try relative URL first (if proxy is set up)
-        response = await axios.post('/api/send-itinerary', {
-          email,
-          itinerary,
-          destination,
-          duration,
-          userInfo: {
-            timestamp: new Date().toISOString()
-          }
-        });
-      } catch (err) {
-        // Fallback to direct server URL
-        response = await axios.post('http://localhost:5001/api/send-itinerary', {
-          email,
-          itinerary,
-          destination,
-          duration,
-          userInfo: {
-            timestamp: new Date().toISOString()
-          }
-        });
-      }
+      // Use environment variable for API URL, fallback to local development
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      const response = await axios.post(`${apiUrl}/api/send-itinerary`, {
+        email,
+        itinerary,
+        destination,
+        duration,
+        userInfo: {
+          timestamp: new Date().toISOString()
+        }
+      });
 
       if (response.data.success) {
         setSuccess(true);

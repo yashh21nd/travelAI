@@ -32,13 +32,9 @@ export default function TravelForm({ onResult }) {
         needAccommodation
       };
       
-      let response;
-      try {
-        response = await axios.post('/api/plan', requestData);
-      } catch (proxyError) {
-        console.log('Proxy failed, trying direct URL');
-        response = await axios.post('http://localhost:5001/api/plan', requestData);
-      }
+      // Use environment variable for API URL, fallback to local development
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      const response = await axios.post(`${apiUrl}/api/plan`, requestData);
       onResult(response.data);
     } catch (err) {
       console.error('API Error:', err);
