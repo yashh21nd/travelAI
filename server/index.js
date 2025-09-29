@@ -15,12 +15,7 @@ const app = express();
 // Enhanced CORS configuration for production deployment
 const corsOptions = {
   origin: [
-    // Your specific Vercel deployment domains
-    'https://travel-ai-yash-dev-2025.vercel.app',
-    'https://travel-ai-yash-dev-2025-git-main-yashs-projects-dadc759f.vercel.app',
-    'https://travel-ai-yash-dev-2025-jtg2tpgpa-yashs-projects-dadc759f.vercel.app',
-    
-    // Additional Vercel project variations
+    // Your current working Vercel deployment domains
     'https://ai-travel-planner-unique-2025.vercel.app',
     'https://travelai-yashh21nd-frontend.vercel.app',
     
@@ -28,9 +23,9 @@ const corsOptions = {
     'http://localhost:3000',
     'http://localhost:5000',
     
-    // Regex patterns for dynamic Vercel domains
-    /^https:\/\/travel-ai-yash-dev-2025.*\.vercel\.app$/,
+    // Regex patterns for dynamic Vercel domains (more permissive)
     /^https:\/\/.*yashs-projects-dadc759f\.vercel\.app$/,
+    /^https:\/\/ai-travel-planner-unique-2025.*\.vercel\.app$/,
     /\.vercel\.app$/,  // Allow any Vercel subdomain
     /\.onrender\.com$/ // Allow Render domains
   ],
@@ -48,12 +43,6 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   console.log(`🌐 Request from origin: ${origin} | Method: ${req.method} | Path: ${req.path}`);
-  
-  // Special logging for the problematic domain
-  if (origin === 'https://travel-ai-yash-dev-2025.vercel.app') {
-    console.log(`🔴 MAIN DOMAIN REQUEST: ${origin} -> ${req.method} ${req.path}`);
-    console.log(`🔍 Request headers:`, req.headers);
-  }
   
   res.header('Access-Control-Allow-Origin', origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
