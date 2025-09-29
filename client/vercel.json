@@ -46,8 +46,9 @@
       "dest": "/index.html"
     }
   ],
-  "env": {
-    "REACT_APP_API_URL": "@react-app-api-url",
-    "REACT_APP_FRONTEND_URL": "@react-app-frontend-url"
+  "functions": {
+    "src/index.js": {
+      "includeFiles": "build/**"
+    }
   }
 }
