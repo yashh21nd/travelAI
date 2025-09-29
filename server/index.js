@@ -11,8 +11,46 @@ const { getPlacesByCity, createDetailedItinerary, getPlacesByRequirement } = req
 const { affiliateConfig, generateAffiliateUrl, calculateRevenue } = require('./config/affiliates');
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+
+// Enhanced CORS configuration for production deployment
+const corsOptions = {
+  origin: [
+    'https://travel-ai-yash-dev-2025.vercel.app',
+    'https://ai-travel-planner-unique-2025.vercel.app',
+    'https://travelai-yashh21nd-frontend.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    /\.vercel\.app$/,  // Allow any Vercel subdomain
+    /\.onrender\.com$/ // Allow Render domains
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Additional CORS headers for preflight requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log(`🌐 Request from origin: ${origin} | Method: ${req.method} | Path: ${req.path}`);
+  
+  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ Handling OPTIONS preflight request from ${origin}`);
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // Root endpoint - Health check
 app.get('/', (req, res) => {
