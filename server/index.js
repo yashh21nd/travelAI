@@ -1268,6 +1268,29 @@ app.post('/api/send-itinerary', async (req, res) => {
   }
 });
 
+// Email configuration test endpoint
+app.get('/api/test-email', async (req, res) => {
+  try {
+    console.log('🔍 Email Configuration Test:');
+    console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set ✅' : 'Not Set ❌');
+    console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'Set ✅' : 'Not Set ❌');
+    
+    const isProductionMode = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com';
+    
+    res.json({
+      emailConfigured: isProductionMode,
+      emailUser: process.env.EMAIL_USER ? 'Set ✅' : 'Not Set ❌',
+      emailPassword: process.env.EMAIL_PASSWORD ? 'Set ✅' : 'Not Set ❌',
+      mode: isProductionMode ? 'Production (Real Email)' : 'Development (Mock Email)',
+      message: isProductionMode ? 
+        'Email service ready to send real emails! 📧' : 
+        'Please configure EMAIL_USER and EMAIL_PASSWORD environment variables on Render'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Contact form API endpoint
 app.post('/api/contact', async (req, res) => {
   try {
