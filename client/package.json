@@ -2,7 +2,7 @@
   "name": "travelai-yashh21nd-client",
   "version": "1.0.0",
   "private": true,
-  "proxy": "http://localhost:5001",
+  "proxy": "http://localhost:5000",
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
     "@emotion/react": "^11.14.0",

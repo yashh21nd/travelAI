@@ -33,7 +33,7 @@ export default function TravelForm({ onResult }) {
       };
       
       // Use environment variable for API URL, fallback to local development
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       const response = await axios.post(`${apiUrl}/api/plan`, requestData);
       onResult(response.data);
     } catch (err) {

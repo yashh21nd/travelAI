@@ -1394,5 +1394,36 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 5000;
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Server Error:', err.stack);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: 'Something went wrong on our end. Please try again.',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Handle 404 routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    message: `Cannot ${req.method} ${req.originalUrl}`,
+    availableEndpoints: {
+      health: 'GET /',
+      plan: 'POST /api/plan',
+      sendItinerary: 'POST /api/send-itinerary',
+      accommodations: 'POST /api/accommodations',
+      places: 'GET /api/places/:destination',
+      contact: 'POST /api/contact'
+    }
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 TravelAI Backend Server running on port ${PORT}`);
+  console.log(`📍 Health check: http://localhost:${PORT}/`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
