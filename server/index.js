@@ -15,11 +15,22 @@ const app = express();
 // Enhanced CORS configuration for production deployment
 const corsOptions = {
   origin: [
+    // Your specific Vercel deployment domains
     'https://travel-ai-yash-dev-2025.vercel.app',
+    'https://travel-ai-yash-dev-2025-git-main-yashs-projects-dadc759f.vercel.app',
+    'https://travel-ai-yash-dev-2025-jtg2tpgpa-yashs-projects-dadc759f.vercel.app',
+    
+    // Additional Vercel project variations
     'https://ai-travel-planner-unique-2025.vercel.app',
     'https://travelai-yashh21nd-frontend.vercel.app',
+    
+    // Development domains
     'http://localhost:3000',
     'http://localhost:5000',
+    
+    // Regex patterns for dynamic Vercel domains
+    /^https:\/\/travel-ai-yash-dev-2025.*\.vercel\.app$/,
+    /^https:\/\/.*yashs-projects-dadc759f\.vercel\.app$/,
     /\.vercel\.app$/,  // Allow any Vercel subdomain
     /\.onrender\.com$/ // Allow Render domains
   ],
