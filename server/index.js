@@ -659,7 +659,7 @@ let transporter;
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com') {
   // Production mode with real SMTP credentials
   console.log('Initializing Gmail SMTP with user:', process.env.EMAIL_USER);
-  transporter = nodemailer.createTransporter({
+  transporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
     port: 587,
@@ -689,7 +689,7 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
       console.log('🔄 Trying alternative SMTP configuration (SSL)...');
       
       // Fallback to port 465 with SSL
-      transporter = nodemailer.createTransporter({
+      transporter = nodemailer.createTransport({
         service: 'gmail',
         host: 'smtp.gmail.com',
         port: 465,
