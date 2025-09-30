@@ -1235,6 +1235,10 @@ app.post('/api/send-itinerary', async (req, res) => {
       return res.status(400).json({ error: 'Email and itinerary are required' });
     }
     
+    // Fix duration issue - default to reasonable value if null
+    const safeDuration = duration || 3;
+    const safeDestination = destination || 'Unknown Destination';
+    
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -1243,7 +1247,7 @@ app.post('/api/send-itinerary', async (req, res) => {
     
     // Create document first
     console.log('📄 Creating PDF document...');
-    const { fileName, filePath } = await createItineraryDocument(itinerary, destination, duration);
+    const { fileName, filePath } = await createItineraryDocument(itinerary, safeDestination, safeDuration);
     console.log('📄 PDF created:', fileName);
     
     // Check if file exists
@@ -1256,14 +1260,14 @@ app.post('/api/send-itinerary', async (req, res) => {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #81C784 0%, #66BB6A 100%); color: white; padding: 30px; text-align: center;">
           <h1>🌍 Your Professional Travel Itinerary</h1>
-          <p style="font-size: 18px; margin: 0;">Destination: ${destination} | Duration: ${duration} days</p>
+          <p style="font-size: 18px; margin: 0;">Destination: ${safeDestination} | Duration: ${safeDuration} days</p>
         </div>
         
         <div style="padding: 30px; background: #f8f9fa;">
           <h2 style="color: #2E7D32;">Hello Travel Enthusiast! 👋</h2>
           <p style="font-size: 16px; line-height: 1.6; color: #424242;">
-            Your personalized travel itinerary for <strong>${destination}</strong> is ready! 
-            We've carefully curated a ${duration}-day journey with specific locations, 
+            Your personalized travel itinerary for <strong>${safeDestination}</strong> is ready! 
+            We've carefully curated a ${safeDuration}-day journey with specific locations, 
             restaurant recommendations, and transportation details.
           </p>
           
@@ -1303,7 +1307,7 @@ app.post('/api/send-itinerary', async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER || 'travelai-pro@gmail.com',
       to: email,
-      subject: `🌍 Your ${destination} Travel Itinerary PDF - ${duration} Days`,
+      subject: `🌍 Your ${safeDestination} Travel Itinerary PDF - ${safeDuration} Days`,
       html: htmlContent,
       attachments: [
         {
@@ -1319,10 +1323,10 @@ app.post('/api/send-itinerary', async (req, res) => {
     // Add timeout to prevent infinite loading
     const emailPromise = transporter.sendMail(mailOptions);
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Email sending timeout - check your email configuration')), 30000)
+      setTimeout(() => reject(new Error('Email sending timeout - check your email configuration')), 90000)
     );
     
-    // Send email with timeout
+    // Send email with longer timeout (90 seconds)
     const result = await Promise.race([emailPromise, timeoutPromise]);
     
     console.log('✅ Email sent successfully:', result.messageId);
