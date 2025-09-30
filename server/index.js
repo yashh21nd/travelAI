@@ -653,17 +653,34 @@ app.get('/api/places/:destination', async (req, res) => {
   }
 });
 
-// Email service configuration with multiple fallback options
+// Email service configuration with SMTP2GO fallback
 let transporter;
 
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com') {
-  // Production mode with multiple SMTP configurations
   console.log('Initializing email service with user:', process.env.EMAIL_USER);
   
-  // Primary configuration: Gmail STARTTLS
-  const createPrimaryTransporter = () => {
-    return nodemailer.createTransport({
-      service: 'gmail',
+  // Check if we should use SMTP2GO as fallback
+  const useSmtp2Go = process.env.SMTP2GO_API_KEY || false;
+  
+  if (useSmtp2Go) {
+    // SMTP2GO configuration (more reliable for cloud hosting)
+    console.log('Using SMTP2GO service for better deliverability');
+    transporter = nodemailer.createTransport({
+      host: 'mail.smtp2go.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP2GO_USERNAME || process.env.EMAIL_USER,
+        pass: process.env.SMTP2GO_PASSWORD || process.env.EMAIL_PASSWORD
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+  } else {
+    // Direct SMTP configuration (bypassing Gmail service detection)
+    console.log('Using direct SMTP configuration');
+    transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
@@ -673,78 +690,27 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
       },
       tls: {
         rejectUnauthorized: false,
-        ciphers: 'SSLv3'
+        servername: 'smtp.gmail.com'
       },
       connectionTimeout: 30000,
-      greetingTimeout: 15000,
+      greetingTimeout: 30000,
       socketTimeout: 30000,
-      pool: true,
-      maxConnections: 1,
-      maxMessages: 1,
+      requireTLS: true,
       debug: false,
       logger: false
     });
-  };
-
-  // Fallback configuration: Gmail SSL
-  const createFallbackTransporter = () => {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      },
-      tls: {
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 30000,
-      greetingTimeout: 15000,
-      socketTimeout: 30000,
-      pool: true,
-      maxConnections: 1,
-      maxMessages: 1,
-      debug: false,
-      logger: false
-    });
-  };
-
-  // Try primary configuration first
-  transporter = createPrimaryTransporter();
+  }
   
-  // Test connection and setup fallback if needed
-  const setupEmailService = async () => {
+  // Simple connection test without blocking startup
+  setTimeout(async () => {
     try {
-      console.log('🔍 Testing primary Gmail SMTP connection...');
-      await Promise.race([
-        transporter.verify(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Connection test timeout')), 10000))
-      ]);
-      console.log('✅ Primary Gmail SMTP ready');
+      console.log('🔍 Testing email service connection...');
+      await transporter.verify();
+      console.log('✅ Email service ready');
     } catch (error) {
-      console.log('❌ Primary SMTP failed:', error.message);
-      console.log('🔄 Switching to fallback configuration...');
-      
-      try {
-        transporter = createFallbackTransporter();
-        await Promise.race([
-          transporter.verify(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Fallback test timeout')), 10000))
-        ]);
-        console.log('✅ Fallback Gmail SMTP ready');
-      } catch (fallbackError) {
-        console.log('❌ Fallback SMTP also failed:', fallbackError.message);
-        console.log('⚠️ Email service will use basic configuration without verification');
-        // Use basic configuration without verification
-        transporter = createPrimaryTransporter();
-      }
+      console.log('⚠️ Email verification failed, but service will still attempt sending:', error.message);
     }
-  };
-  
-  // Setup email service asynchronously
-  setupEmailService();
+  }, 5000);
 } else {
   // Development mode - Create test account or mock transporter
   transporter = {
@@ -1351,83 +1317,57 @@ app.post('/api/send-itinerary', async (req, res) => {
     };
     
     console.log('📧 Attempting to send email to:', email);
-    console.log('📧 Using email service with optimized configuration');
+    console.log('📧 Using optimized email service');
     
-    // Retry email sending with multiple attempts
-    let lastError;
-    const maxRetries = 2;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`📧 Email attempt ${attempt}/${maxRetries}`);
-        
-        // Create a fresh transporter for each attempt if previous failed
-        if (attempt > 1) {
-          console.log('🔄 Creating fresh email connection...');
-          transporter = nodemailer.createTransport({
-            service: 'gmail',
-            host: 'smtp.gmail.com',
-            port: attempt === 2 ? 465 : 587,
-            secure: attempt === 2,
-            auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASSWORD
-            },
-            tls: {
-              rejectUnauthorized: false
-            },
-            connectionTimeout: 20000,
-            greetingTimeout: 10000,
-            socketTimeout: 20000,
-            pool: false, // Don't use connection pooling for retries
-            debug: false,
-            logger: false
-          });
+    // Try sending email with single robust attempt
+    try {
+      console.log('📧 Sending email with PDF attachment...');
+      
+      const emailPromise = transporter.sendMail(mailOptions);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email service timeout - Gmail may be blocking server connections')), 30000)
+      );
+      
+      const result = await Promise.race([emailPromise, timeoutPromise]);
+      
+      console.log('✅ Email sent successfully:', result.messageId);
+      
+      // Clean up file after sending
+      setTimeout(() => {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
         }
-        
-        // Send email with timeout for this specific attempt
-        const emailPromise = transporter.sendMail(mailOptions);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(`Email attempt ${attempt} timeout`)), 45000)
-        );
-        
-        const result = await Promise.race([emailPromise, timeoutPromise]);
-        
-        console.log(`✅ Email sent successfully on attempt ${attempt}:`, result.messageId);
-        
-        // Success - break out of retry loop
-        lastError = null;
-        
-        // Clean up file after successful sending
-        setTimeout(() => {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        }, 60000);
-        
-        // Success response
-        return res.json({ 
-          success: true, 
-          message: 'Itinerary sent successfully! ✅',
-          documentCreated: fileName,
-          emailSent: result.messageId || 'sent',
-          attempt: attempt,
-          developmentMode: false
-        });
-        
-      } catch (attemptError) {
-        console.error(`❌ Email attempt ${attempt} failed:`, attemptError.message);
-        lastError = attemptError;
-        
-        if (attempt < maxRetries) {
-          console.log(`⏳ Waiting before retry attempt ${attempt + 1}...`);
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
-        }
-      }
+      }, 60000);
+      
+      // Success response
+      return res.json({ 
+        success: true, 
+        message: 'Itinerary sent successfully! ✅',
+        documentCreated: fileName,
+        emailSent: result.messageId || 'sent',
+        developmentMode: false
+      });
+      
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError.message);
+      
+      // Instead of failing, provide the PDF download option
+      console.log('💡 Providing PDF download as alternative...');
+      
+      // Keep the PDF file for download instead of deleting it
+      const downloadUrl = `/api/download-itinerary/${fileName}`;
+      
+      return res.json({
+        success: false,
+        error: 'Email service temporarily unavailable',
+        message: 'Gmail is blocking server connections. Your PDF is ready for download.',
+        downloadAvailable: true,
+        downloadUrl: downloadUrl,
+        fileName: fileName,
+        suggestion: 'Use the download button below to get your itinerary PDF',
+        troubleshooting: 'Email service will be restored soon. For now, download the PDF directly.'
+      });
     }
-    
-    // If we get here, all attempts failed
-    throw lastError || new Error('All email attempts failed');
     
   } catch (error) {
     console.error('❌ Email sending failed:', error.message);
@@ -1547,6 +1487,38 @@ app.post('/api/test-send-email', async (req, res) => {
       error: error.message,
       code: error.code
     });
+  }
+});
+
+// PDF download endpoint for when email fails
+app.get('/api/download-itinerary/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, 'documents', filename);
+    
+    console.log('📄 Download request for:', filename);
+    
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, filename, (err) => {
+        if (err) {
+          console.error('Download error:', err);
+          res.status(500).json({ error: 'Download failed' });
+        } else {
+          console.log('✅ File downloaded successfully:', filename);
+          // Clean up file after download
+          setTimeout(() => {
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }, 300000); // Delete after 5 minutes
+        }
+      });
+    } else {
+      res.status(404).json({ error: 'File not found' });
+    }
+  } catch (error) {
+    console.error('Download endpoint error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

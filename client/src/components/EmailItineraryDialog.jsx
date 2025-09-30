@@ -4,7 +4,7 @@ import {
   TextField, Button, Box, Typography, Alert, CircularProgress,
   Card, CardContent, InputAdornment
 } from '@mui/material';
-import { Email, Send, CheckCircle, AttachFile } from '@mui/icons-material';
+import { Email, Send, CheckCircle, AttachFile, Download } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -13,6 +13,8 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState('');
+  const [fileName, setFileName] = useState('');
 
   const handleSendEmail = async () => {
     if (!email || !email.includes('@')) {
@@ -43,6 +45,11 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
           setSuccess(false);
           setEmail('');
         }, 3000);
+      } else if (response.data.downloadAvailable) {
+        // Email failed but PDF is available for download
+        setError(response.data.message || 'Email failed but your PDF is ready for download!');
+        setDownloadUrl(response.data.downloadUrl);
+        setFileName(response.data.fileName);
       } else {
         setError(response.data.error || response.data.message || 'Email service temporarily unavailable. Please try again later.');
       }
@@ -87,6 +94,8 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
       setEmail('');
       setError('');
       setSuccess(false);
+      setDownloadUrl('');
+      setFileName('');
     }
   };
 
@@ -195,8 +204,28 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
             />
 
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert severity={downloadUrl ? "warning" : "error"} sx={{ mb: 2 }}>
                 {error}
+                {downloadUrl && (
+                  <Box sx={{ mt: 1 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<Download />}
+                      href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${downloadUrl}`}
+                      download={fileName}
+                      sx={{
+                        background: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)',
+                        color: 'white',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #F57C00 0%, #E65100 100%)',
+                        }
+                      }}
+                    >
+                      Download PDF Instead
+                    </Button>
+                  </Box>
+                )}
               </Alert>
             )}
 
