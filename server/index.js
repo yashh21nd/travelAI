@@ -659,26 +659,59 @@ let transporter;
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com') {
   // Production mode with real SMTP credentials
   console.log('Initializing Gmail SMTP with user:', process.env.EMAIL_USER);
-  transporter = nodemailer.createTransport({
+  transporter = nodemailer.createTransporter({
     service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Use STARTTLS instead of SSL
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD
     },
-    secure: true,
-    port: 465,
-    debug: true, // Enable debug logs
-    logger: true // Enable logging
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 60000, // 60 seconds
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 60000, // 60 seconds
+    debug: true,
+    logger: true
   });
   
-  // Test the connection
-  transporter.verify((error, success) => {
-    if (error) {
-      console.log('❌ Gmail SMTP connection failed:', error.message);
-    } else {
+  // Test the connection with async/await
+  const testConnection = async () => {
+    try {
+      console.log('🔍 Testing Gmail SMTP connection...');
+      await transporter.verify();
       console.log('✅ Gmail SMTP server is ready to send emails');
+    } catch (error) {
+      console.log('❌ Gmail SMTP connection failed:', error.message);
+      console.log('🔄 Trying alternative SMTP configuration (SSL)...');
+      
+      // Fallback to port 465 with SSL
+      transporter = nodemailer.createTransporter({
+        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // Use SSL
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 60000,
+        greetingTimeout: 30000,
+        socketTimeout: 60000,
+        debug: true,
+        logger: true
+      });
     }
-  });
+  };
+  
+  // Test connection asynchronously
+  testConnection();
 } else {
   // Development mode - Create test account or mock transporter
   transporter = {
@@ -1212,33 +1245,6 @@ app.post('/api/send-itinerary', async (req, res) => {
     console.log('📄 Creating PDF document...');
     const { fileName, filePath } = await createItineraryDocument(itinerary, destination, duration);
     console.log('📄 PDF created:', fileName);
-    
-    // Test Gmail connection before sending
-    try {
-      console.log('🔍 Testing Gmail connection...');
-      if (transporter.verify) {
-        await transporter.verify();
-        console.log('✅ Gmail connection verified successfully');
-      } else {
-        console.log('⚠️ Transporter verify method not available (development mode)');
-      }
-    } catch (verifyError) {
-      console.error('❌ Gmail connection test failed:', verifyError.message);
-      console.error('❌ Verify error details:', {
-        code: verifyError.code,
-        command: verifyError.command,
-        response: verifyError.response
-      });
-      
-      // Return early if connection fails
-      return res.status(500).json({
-        success: false,
-        error: 'Gmail connection failed',
-        message: verifyError.message,
-        code: verifyError.code,
-        suggestion: 'Check your Gmail app password and account settings'
-      });
-    }
     
     // Check if file exists
     if (!fs.existsSync(filePath)) {
