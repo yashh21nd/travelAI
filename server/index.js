@@ -916,7 +916,14 @@ async function createItineraryDocument(itinerary, destination, duration) {
             margin-bottom: 25px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             border-left: 6px solid #4CAF50;
+            page-break-before: always;
             page-break-inside: avoid;
+            min-height: 500px;
+        }
+        
+        /* First day should not have page break before */
+        .day-block:first-of-type {
+            page-break-before: auto;
         }
         
         .day-title {
@@ -1022,8 +1029,36 @@ async function createItineraryDocument(itinerary, destination, duration) {
         }
         
         @media print {
-            body { padding: 0; }
-            .container { box-shadow: none; }
+            body { 
+                padding: 0; 
+                font-size: 12pt;
+                line-height: 1.4;
+            }
+            .container { 
+                box-shadow: none; 
+                border-radius: 0;
+            }
+            .day-block {
+                page-break-before: always;
+                page-break-inside: avoid;
+                margin-bottom: 0;
+                box-shadow: none;
+                min-height: auto;
+            }
+            .day-block:first-of-type {
+                page-break-before: auto;
+            }
+            .header {
+                page-break-after: avoid;
+            }
+            .trip-info {
+                page-break-after: avoid;
+            }
+            .activity {
+                page-break-inside: avoid;
+                box-shadow: none;
+                background: #f9f9f9 !important;
+            }
         }
     </style>
 </head>
@@ -1130,6 +1165,13 @@ app.post('/api/send-itinerary', async (req, res) => {
   try {
     const { email, itinerary, destination, duration, userInfo } = req.body;
     
+    console.log('📧 Email request received:', { email, destination, duration });
+    console.log('📧 Environment check:', {
+      hasEmailUser: !!process.env.EMAIL_USER,
+      hasEmailPassword: !!process.env.EMAIL_PASSWORD,
+      isProduction: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com')
+    });
+    
     if (!email || !itinerary) {
       return res.status(400).json({ error: 'Email and itinerary are required' });
     }
@@ -1140,8 +1182,15 @@ app.post('/api/send-itinerary', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
     
-    // Create document
+    // Create document first
+    console.log('📄 Creating PDF document...');
     const { fileName, filePath } = await createItineraryDocument(itinerary, destination, duration);
+    console.log('📄 PDF created:', fileName);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      throw new Error('PDF document creation failed');
+    }
     
     // Email template
     const htmlContent = `
@@ -1208,8 +1257,14 @@ app.post('/api/send-itinerary', async (req, res) => {
     console.log('📧 Attempting to send email to:', email);
     console.log('📧 Using transporter:', process.env.EMAIL_USER ? 'Gmail SMTP' : 'Development Mode');
     
-    // Send email
-    const result = await transporter.sendMail(mailOptions);
+    // Add timeout to prevent infinite loading
+    const emailPromise = transporter.sendMail(mailOptions);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Email sending timeout - check your email configuration')), 30000)
+    );
+    
+    // Send email with timeout
+    const result = await Promise.race([emailPromise, timeoutPromise]);
     
     console.log('✅ Email sent successfully:', result.messageId);
     
