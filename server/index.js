@@ -1286,28 +1286,45 @@ app.post('/api/send-itinerary', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Email sending failed:', error.message);
-    console.error('Error details:', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error response:', error.response);
+    console.error('❌ Full error details:', JSON.stringify(error, null, 2));
     
-    // Specific error handling
+    // Specific error handling with detailed messages
     let errorMessage = 'Failed to send email';
     let suggestion = 'Please try again';
+    let troubleshooting = '';
     
     if (error.code === 'EAUTH') {
-      errorMessage = 'Email authentication failed';
-      suggestion = 'Check your Gmail app password and 2FA settings';
-    } else if (error.code === 'ECONNECTION') {
+      errorMessage = 'Gmail authentication failed';
+      suggestion = 'Your Gmail app password may be incorrect or expired';
+      troubleshooting = 'Generate a new app password: myaccount.google.com/security → App passwords';
+    } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
       errorMessage = 'Connection to Gmail failed';
-      suggestion = 'Check your internet connection';
+      suggestion = 'Gmail servers may be temporarily unavailable';
+      troubleshooting = 'Try again in a few minutes or check Gmail service status';
     } else if (error.message.includes('Invalid login')) {
       errorMessage = 'Invalid Gmail credentials';
-      suggestion = 'Verify your email and app password';
+      suggestion = 'Check your email and app password configuration';
+      troubleshooting = 'Verify EMAIL_USER and EMAIL_PASSWORD are correct';
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'Email sending timeout';
+      suggestion = 'Gmail is taking too long to respond';
+      troubleshooting = 'Try sending again or check your internet connection';
+    } else if (error.code === 'EMESSAGE') {
+      errorMessage = 'Email message format error';
+      suggestion = 'There may be an issue with the email content or attachment';
+      troubleshooting = 'The PDF attachment might be corrupted';
     }
     
     res.status(500).json({ 
+      success: false,
       error: errorMessage,
       message: error.message,
       suggestion: suggestion,
-      code: error.code || 'UNKNOWN_ERROR'
+      troubleshooting: troubleshooting,
+      code: error.code || 'UNKNOWN_ERROR',
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -1321,17 +1338,70 @@ app.get('/api/test-email', async (req, res) => {
     
     const isProductionMode = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com';
     
+    // Test actual Gmail connection if in production mode
+    let connectionTest = 'Not tested';
+    if (isProductionMode && transporter.verify) {
+      try {
+        await transporter.verify();
+        connectionTest = 'Connection successful ✅';
+      } catch (verifyError) {
+        connectionTest = `Connection failed: ${verifyError.message} ❌`;
+      }
+    }
+    
     res.json({
       emailConfigured: isProductionMode,
       emailUser: process.env.EMAIL_USER ? 'Set ✅' : 'Not Set ❌',
       emailPassword: process.env.EMAIL_PASSWORD ? 'Set ✅' : 'Not Set ❌',
       mode: isProductionMode ? 'Production (Real Email)' : 'Development (Mock Email)',
+      gmailConnection: connectionTest,
+      currentEmailUser: process.env.EMAIL_USER || 'Not configured',
       message: isProductionMode ? 
         'Email service ready to send real emails! 📧' : 
         'Please configure EMAIL_USER and EMAIL_PASSWORD environment variables on Render'
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Simple email test endpoint
+app.post('/api/test-send-email', async (req, res) => {
+  try {
+    const { testEmail } = req.body;
+    
+    if (!testEmail) {
+      return res.status(400).json({ error: 'Test email address required' });
+    }
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'travelai-pro@gmail.com',
+      to: testEmail,
+      subject: '🧪 TravelAI Email Test',
+      html: `
+        <h2>Email Test Successful! ✅</h2>
+        <p>Your TravelAI email service is working correctly.</p>
+        <p>Timestamp: ${new Date().toISOString()}</p>
+      `
+    };
+    
+    console.log('🧪 Sending test email to:', testEmail);
+    const result = await transporter.sendMail(mailOptions);
+    
+    res.json({
+      success: true,
+      message: 'Test email sent successfully! ✅',
+      messageId: result.messageId,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Test email failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      code: error.code
+    });
   }
 });
 
