@@ -653,65 +653,98 @@ app.get('/api/places/:destination', async (req, res) => {
   }
 });
 
-// Email service configuration - Development Mode
+// Email service configuration with multiple fallback options
 let transporter;
 
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com') {
-  // Production mode with real SMTP credentials
-  console.log('Initializing Gmail SMTP with user:', process.env.EMAIL_USER);
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // Use STARTTLS instead of SSL
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    },
-    tls: {
-      rejectUnauthorized: false
-    },
-    connectionTimeout: 60000, // 60 seconds
-    greetingTimeout: 30000, // 30 seconds
-    socketTimeout: 60000, // 60 seconds
-    debug: true,
-    logger: true
-  });
+  // Production mode with multiple SMTP configurations
+  console.log('Initializing email service with user:', process.env.EMAIL_USER);
   
-  // Test the connection with async/await
-  const testConnection = async () => {
+  // Primary configuration: Gmail STARTTLS
+  const createPrimaryTransporter = () => {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      },
+      tls: {
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3'
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 1,
+      debug: false,
+      logger: false
+    });
+  };
+
+  // Fallback configuration: Gmail SSL
+  const createFallbackTransporter = () => {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      },
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 1,
+      debug: false,
+      logger: false
+    });
+  };
+
+  // Try primary configuration first
+  transporter = createPrimaryTransporter();
+  
+  // Test connection and setup fallback if needed
+  const setupEmailService = async () => {
     try {
-      console.log('🔍 Testing Gmail SMTP connection...');
-      await transporter.verify();
-      console.log('✅ Gmail SMTP server is ready to send emails');
+      console.log('🔍 Testing primary Gmail SMTP connection...');
+      await Promise.race([
+        transporter.verify(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Connection test timeout')), 10000))
+      ]);
+      console.log('✅ Primary Gmail SMTP ready');
     } catch (error) {
-      console.log('❌ Gmail SMTP connection failed:', error.message);
-      console.log('🔄 Trying alternative SMTP configuration (SSL)...');
+      console.log('❌ Primary SMTP failed:', error.message);
+      console.log('🔄 Switching to fallback configuration...');
       
-      // Fallback to port 465 with SSL
-      transporter = nodemailer.createTransport({
-        service: 'gmail',
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // Use SSL
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD
-        },
-        tls: {
-          rejectUnauthorized: false
-        },
-        connectionTimeout: 60000,
-        greetingTimeout: 30000,
-        socketTimeout: 60000,
-        debug: true,
-        logger: true
-      });
+      try {
+        transporter = createFallbackTransporter();
+        await Promise.race([
+          transporter.verify(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Fallback test timeout')), 10000))
+        ]);
+        console.log('✅ Fallback Gmail SMTP ready');
+      } catch (fallbackError) {
+        console.log('❌ Fallback SMTP also failed:', fallbackError.message);
+        console.log('⚠️ Email service will use basic configuration without verification');
+        // Use basic configuration without verification
+        transporter = createPrimaryTransporter();
+      }
     }
   };
   
-  // Test connection asynchronously
-  testConnection();
+  // Setup email service asynchronously
+  setupEmailService();
 } else {
   // Development mode - Create test account or mock transporter
   transporter = {
@@ -1318,34 +1351,83 @@ app.post('/api/send-itinerary', async (req, res) => {
     };
     
     console.log('📧 Attempting to send email to:', email);
-    console.log('📧 Using transporter:', process.env.EMAIL_USER ? 'Gmail SMTP' : 'Development Mode');
+    console.log('📧 Using email service with optimized configuration');
     
-    // Add timeout to prevent infinite loading
-    const emailPromise = transporter.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Email sending timeout - check your email configuration')), 90000)
-    );
+    // Retry email sending with multiple attempts
+    let lastError;
+    const maxRetries = 2;
     
-    // Send email with longer timeout (90 seconds)
-    const result = await Promise.race([emailPromise, timeoutPromise]);
-    
-    console.log('✅ Email sent successfully:', result.messageId);
-    
-    // Clean up file after sending
-    setTimeout(() => {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📧 Email attempt ${attempt}/${maxRetries}`);
+        
+        // Create a fresh transporter for each attempt if previous failed
+        if (attempt > 1) {
+          console.log('🔄 Creating fresh email connection...');
+          transporter = nodemailer.createTransport({
+            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: attempt === 2 ? 465 : 587,
+            secure: attempt === 2,
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASSWORD
+            },
+            tls: {
+              rejectUnauthorized: false
+            },
+            connectionTimeout: 20000,
+            greetingTimeout: 10000,
+            socketTimeout: 20000,
+            pool: false, // Don't use connection pooling for retries
+            debug: false,
+            logger: false
+          });
+        }
+        
+        // Send email with timeout for this specific attempt
+        const emailPromise = transporter.sendMail(mailOptions);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Email attempt ${attempt} timeout`)), 45000)
+        );
+        
+        const result = await Promise.race([emailPromise, timeoutPromise]);
+        
+        console.log(`✅ Email sent successfully on attempt ${attempt}:`, result.messageId);
+        
+        // Success - break out of retry loop
+        lastError = null;
+        
+        // Clean up file after successful sending
+        setTimeout(() => {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }, 60000);
+        
+        // Success response
+        return res.json({ 
+          success: true, 
+          message: 'Itinerary sent successfully! ✅',
+          documentCreated: fileName,
+          emailSent: result.messageId || 'sent',
+          attempt: attempt,
+          developmentMode: false
+        });
+        
+      } catch (attemptError) {
+        console.error(`❌ Email attempt ${attempt} failed:`, attemptError.message);
+        lastError = attemptError;
+        
+        if (attempt < maxRetries) {
+          console.log(`⏳ Waiting before retry attempt ${attempt + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        }
       }
-    }, 60000); // Delete after 1 minute
+    }
     
-    // Success response
-    res.json({ 
-      success: true, 
-      message: 'Itinerary sent successfully! ✅',
-      documentCreated: fileName,
-      emailSent: result.messageId || 'dev-mode',
-      developmentMode: !process.env.EMAIL_USER || process.env.EMAIL_USER === 'your-email@gmail.com'
-    });
+    // If we get here, all attempts failed
+    throw lastError || new Error('All email attempts failed');
     
   } catch (error) {
     console.error('❌ Email sending failed:', error.message);
