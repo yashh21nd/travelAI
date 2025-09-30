@@ -856,21 +856,20 @@ async function createItineraryDocument(itinerary, destination, duration) {
     fs.mkdirSync(path.join(__dirname, 'documents'), { recursive: true });
   }
   
-  // Clean and format itinerary content
+  // Clean and format itinerary content more efficiently
   const cleanItinerary = itinerary
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/=\d{2}/g, '') // Remove =21, =22 etc.
-    .replace(/=\w{2}/g, '') // Remove other encoded characters
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-  
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/=\d{2}/g, '')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${destination} - ${duration} Days Travel Itinerary</title>
+    <title>${destination} Travel Itinerary</title>
     <style>
         * {
             margin: 0;
@@ -880,230 +879,239 @@ async function createItineraryDocument(itinerary, destination, duration) {
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #fff;
-            padding: 20px;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #2d3748;
+            background: #ffffff;
         }
         
         .container {
-            max-width: 800px;
+            max-width: 100%;
             margin: 0 auto;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-            overflow: hidden;
         }
         
         .header {
-            background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 40px;
+            padding: 25px 30px;
             text-align: center;
+            margin-bottom: 15px;
         }
         
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            font-size: 24pt;
             font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
         }
         
         .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
+            font-size: 12pt;
+            opacity: 0.95;
+            font-weight: 300;
         }
         
         .content {
-            padding: 40px;
+            padding: 0 20px 20px;
         }
         
-        .trip-info {
-            display: flex;
-            justify-content: space-around;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
+        .trip-overview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .overview-item {
             text-align: center;
+            padding: 8px;
         }
         
-        .trip-info div {
-            flex: 1;
-        }
-        
-        .trip-info h3 {
-            color: #2E7D32;
-            font-size: 1rem;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .trip-info p {
-            font-size: 1.2rem;
+        .overview-item h3 {
+            color: #4a5568;
+            font-size: 9pt;
             font-weight: 600;
-            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
         }
         
-        .itinerary-section {
-            margin-bottom: 30px;
-            border-left: 4px solid #66BB6A;
-            padding-left: 20px;
-            background: #fafafa;
-            padding: 20px;
-            border-radius: 0 10px 10px 0;
+        .overview-item p {
+            color: #1a202c;
+            font-size: 11pt;
+            font-weight: 700;
         }
         
-        .day-block {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 25px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            border-left: 6px solid #4CAF50;
-            page-break-before: always;
+        .day-section {
+            margin-bottom: 20px;
             page-break-inside: avoid;
-            min-height: 500px;
+            break-inside: avoid;
         }
         
-        /* First day should not have page break before */
-        .day-block:first-of-type {
-            page-break-before: auto;
+        .day-header {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px 6px 0 0;
+            margin-bottom: 0;
         }
         
         .day-title {
-            color: #2E7D32;
-            font-size: 1.6rem;
+            font-size: 14pt;
             font-weight: 700;
-            margin-bottom: 20px;
+            margin: 0;
             display: flex;
             align-items: center;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #E8F5E8;
-        }
-        
-        .day-content {
-            margin-top: 15px;
         }
         
         .day-title::before {
             content: "📅";
-            margin-right: 10px;
-            font-size: 1.2rem;
+            margin-right: 8px;
+            font-size: 12pt;
         }
         
-        .activity {
-            margin-bottom: 12px;
-            padding: 18px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-            border-radius: 10px;
-            border-left: 4px solid #81C784;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        .day-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            padding: 15px;
         }
         
-        .activity p {
+        .activity-item {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px;
             margin-bottom: 8px;
-            font-size: 1rem;
-            line-height: 1.5;
+            break-inside: avoid;
         }
         
-        .activity strong {
-            color: #2E7D32;
+        .activity-item p {
+            color: #4a5568;
+            font-size: 10pt;
+            line-height: 1.4;
+            margin: 4px 0;
         }
         
         .google-link {
-            color: #1976D2;
+            display: inline-block;
+            color: #3182ce;
             text-decoration: none;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            background: #E3F2FD;
-            padding: 5px 10px;
-            border-radius: 5px;
-            margin-top: 5px;
-            font-size: 0.9rem;
+            font-size: 8pt;
+            background: #ebf8ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+            border: 1px solid #bee3f8;
         }
         
         .google-link::before {
-            content: "🗺️";
-            margin-right: 5px;
+            content: "🗺️ ";
+            font-size: 7pt;
         }
         
-        .budget-section {
-            background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%);
-            padding: 25px;
-            border-radius: 10px;
-            margin-top: 30px;
+        .budget-summary {
+            background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
+            border: 1px solid #9ae6b4;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            page-break-inside: avoid;
         }
         
         .budget-title {
-            color: #2E7D32;
-            font-size: 1.8rem;
+            color: #22543d;
+            font-size: 14pt;
             font-weight: 700;
-            margin-bottom: 20px;
             text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        .budget-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
         }
         
         .budget-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(46, 125, 50, 0.2);
+            align-items: center;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #c6f6d5;
         }
         
-        .budget-item:last-child {
-            border-bottom: none;
-            font-weight: 700;
-            font-size: 1.1rem;
+        .budget-item span:first-child {
+            color: #2d3748;
+            font-weight: 500;
+            font-size: 9pt;
+        }
+        
+        .budget-item span:last-child {
+            color: #22543d;
+            font-weight: 600;
+            font-size: 9pt;
         }
         
         .footer {
-            background: #2E7D32;
+            background: #2d3748;
             color: white;
-            padding: 30px;
+            padding: 15px;
             text-align: center;
+            margin-top: 20px;
+            font-size: 8pt;
         }
         
         .footer p {
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
         
-        .emoji {
-            font-size: 1.2em;
-            margin-right: 8px;
+        .generation-info {
+            background: #edf2f7;
+            padding: 8px 12px;
+            text-align: center;
+            font-size: 7pt;
+            color: #4a5568;
+            border-top: 1px solid #e2e8f0;
         }
         
+        /* Print optimizations for better performance */
         @media print {
             body { 
-                padding: 0; 
-                font-size: 12pt;
-                line-height: 1.4;
+                font-size: 9pt;
+                line-height: 1.3;
             }
-            .container { 
-                box-shadow: none; 
-                border-radius: 0;
-            }
-            .day-block {
+            
+            .day-section {
                 page-break-before: always;
                 page-break-inside: avoid;
-                margin-bottom: 0;
-                box-shadow: none;
-                min-height: auto;
             }
-            .day-block:first-of-type {
+            
+            .day-section:first-of-type {
                 page-break-before: auto;
             }
-            .header {
-                page-break-after: avoid;
-            }
-            .trip-info {
-                page-break-after: avoid;
-            }
-            .activity {
+            
+            .activity-item {
+                margin-bottom: 6px;
                 page-break-inside: avoid;
-                box-shadow: none;
-                background: #f9f9f9 !important;
             }
+            
+            .budget-summary {
+                page-break-before: always;
+            }
+        }
+        
+        @page {
+            margin: 0.6in;
+            size: A4;
         }
     </style>
 </head>
@@ -1115,72 +1123,76 @@ async function createItineraryDocument(itinerary, destination, duration) {
         </div>
         
         <div class="content">
-            <div class="trip-info">
-                <div>
+            <div class="trip-overview">
+                <div class="overview-item">
                     <h3>Destination</h3>
                     <p>${destination}</p>
                 </div>
-                <div>
+                <div class="overview-item">
                     <h3>Duration</h3>
                     <p>${duration} Days</p>
                 </div>
-                <div>
+                <div class="overview-item">
                     <h3>Generated</h3>
                     <p>${new Date().toLocaleDateString()}</p>
                 </div>
             </div>
             
-            <div class="itinerary-section">
-                ${formatItineraryForPDF(cleanItinerary)}
-            </div>
+            ${formatItineraryForPDF(cleanItinerary)}
             
-            <div class="budget-section">
-                <div class="budget-title">💰 Investment Summary</div>
-                <div class="budget-item">
-                    <span>📝 Complete Itinerary Planning</span>
-                    <span>Included</span>
-                </div>
-                <div class="budget-item">
-                    <span>🗺️ Google Maps Integration</span>
-                    <span>Included</span>
-                </div>
-                <div class="budget-item">
-                    <span>🍽️ Restaurant Recommendations</span>
-                    <span>Included</span>
-                </div>
-                <div class="budget-item">
-                    <span>🏨 Accommodation Analysis</span>
-                    <span>Included</span>
-                </div>
-                <div class="budget-item">
-                    <span>📧 Professional Document Delivery</span>
-                    <span>Free</span>
+            <div class="budget-summary">
+                <div class="budget-title">💰 What's Included</div>
+                <div class="budget-grid">
+                    <div class="budget-item">
+                        <span>📝 Complete Itinerary</span>
+                        <span>Included</span>
+                    </div>
+                    <div class="budget-item">
+                        <span>🗺️ Maps Integration</span>
+                        <span>Included</span>
+                    </div>
+                    <div class="budget-item">
+                        <span>🍽️ Restaurant Guides</span>
+                        <span>Included</span>
+                    </div>
+                    <div class="budget-item">
+                        <span>🏨 Accommodation Tips</span>
+                        <span>Included</span>
+                    </div>
                 </div>
             </div>
         </div>
         
         <div class="footer">
-            <p><strong>© 2025 TravelAI Pro - Professional Travel Planning Made Easy</strong></p>
-            <p>🚀 AI-Powered Platform | 📧 Email: travelplanner.ai.service@gmail.com</p>
-            <p><em>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</em></p>
+            <p><strong>© 2025 TravelAI Pro - AI-Powered Travel Planning</strong></p>
+            <p>📧 travelplanner.ai.service@gmail.com | 🌐 Professional Travel Solutions</p>
+        </div>
+        
+        <div class="generation-info">
+            Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} | Document ID: ${Math.random().toString(36).substr(2, 9).toUpperCase()}
         </div>
     </div>
 </body>
 </html>`;
 
-  // Generate PDF from HTML
+  // Optimized PDF generation options for much faster processing
   try {
     const options = {
       format: 'A4',
       border: {
-        top: '0.5in',
-        right: '0.5in',
-        bottom: '0.5in',
-        left: '0.5in'
+        top: '0.4in',
+        right: '0.4in',
+        bottom: '0.4in',
+        left: '0.4in'
       },
       displayHeaderFooter: false,
       printBackground: true,
-      preferCSSPageSize: true
+      preferCSSPageSize: true,
+      // Performance optimizations
+      timeout: 10000, // Reduced from 30s to 10s
+      quality: 70, // Reduced quality for faster generation
+      type: 'pdf',
+      renderDelay: 200 // Reduced render delay significantly
     };
 
     const file = { content: htmlContent };

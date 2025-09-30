@@ -879,7 +879,7 @@ export default function ItineraryResult({ result, onBack }) {
               }
             }}
           >
-            📧 Email Itinerary
+            � Download PDF
           </Button>
         </Stack>
 
