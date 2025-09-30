@@ -8,7 +8,7 @@ import { Download, CheckCircle, AttachFile } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
-export default function EmailItineraryDialog({ open, onClose, itinerary, destination, duration }) {
+export default function EmailItineraryDialog({ open, onClose, itinerary, destination, duration, fullName }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +30,7 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
         itinerary,
         destination,
         duration,
+        fullName: fullName || 'Guest',
         userInfo: {
           timestamp: new Date().toISOString()
         }

@@ -593,14 +593,15 @@ function generateProfessionalItinerary(destination, budget, duration, currency, 
 }
 
 app.post('/api/plan', async (req, res) => {
-  const { destination, budget, duration, currency, travelWith, userLocation, needAccommodation } = req.body;
+  const { fullName, destination, budget, duration, currency, travelWith, userLocation, needAccommodation } = req.body;
   try {
-    console.log(`Generating itinerary for ${destination}, ${duration} days, ${budget} ${currency}, traveling with ${travelWith}`);
+    console.log(`Generating itinerary for ${fullName || 'Guest'} - ${destination}, ${duration} days, ${budget} ${currency}, traveling with ${travelWith}`);
     
     // Try Hugging Face API first, fallback to enhanced generator
     const plan = await generateAIItinerary(destination, budget, duration, currency, travelWith, userLocation, needAccommodation);
     
     res.json({ 
+      fullName: fullName || 'Guest',
       destination, 
       budget, 
       duration,
@@ -847,7 +848,7 @@ function formatItineraryForPDF(itinerary) {
 }
 
 // Create professional HTML document from itinerary
-async function createItineraryDocument(itinerary, destination, duration) {
+async function createItineraryDocument(itinerary, destination, duration, fullName = 'Guest') {
   const fileName = `${destination.replace(/\s+/g, '_')}_${duration}days_itinerary.pdf`;
   const filePath = path.join(__dirname, 'documents', fileName);
   
@@ -918,7 +919,7 @@ async function createItineraryDocument(itinerary, destination, duration) {
         
         .trip-overview {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             margin-bottom: 20px;
             padding: 15px;
@@ -1119,21 +1120,25 @@ async function createItineraryDocument(itinerary, destination, duration) {
     <div class="container">
         <div class="header">
             <h1>🌍 ${destination}</h1>
-            <p>Professional ${duration}-Day Travel Itinerary</p>
+            <p>Professional ${duration}-Day Travel Itinerary for ${fullName}</p>
         </div>
         
         <div class="content">
             <div class="trip-overview">
                 <div class="overview-item">
-                    <h3>Destination</h3>
+                    <h3>👤 Traveler</h3>
+                    <p>${fullName}</p>
+                </div>
+                <div class="overview-item">
+                    <h3>🎯 Destination</h3>
                     <p>${destination}</p>
                 </div>
                 <div class="overview-item">
-                    <h3>Duration</h3>
+                    <h3>📅 Duration</h3>
                     <p>${duration} Days</p>
                 </div>
                 <div class="overview-item">
-                    <h3>Generated</h3>
+                    <h3>📄 Generated</h3>
                     <p>${new Date().toLocaleDateString()}</p>
                 </div>
             </div>
@@ -1220,7 +1225,7 @@ async function createItineraryDocument(itinerary, destination, duration) {
 // Send itinerary via email
 app.post('/api/send-itinerary', async (req, res) => {
   try {
-    const { email, itinerary, destination, duration, userInfo } = req.body;
+    const { email, itinerary, destination, duration, fullName, userInfo } = req.body;
     
     console.log('📧 Email request received:', { email, destination, duration });
     console.log('📧 Environment check:', {
@@ -1258,7 +1263,7 @@ app.post('/api/send-itinerary', async (req, res) => {
     
     // Create document first
     console.log('📄 Creating PDF document...');
-    const { fileName, filePath } = await createItineraryDocument(itinerary, safeDestination, safeDuration);
+    const { fileName, filePath } = await createItineraryDocument(itinerary, safeDestination, safeDuration, fullName || 'Guest');
     console.log('📄 PDF created:', fileName);
     
     // Check if file exists

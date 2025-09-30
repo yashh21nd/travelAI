@@ -890,6 +890,7 @@ export default function ItineraryResult({ result, onBack }) {
           itinerary={result.plan}
           destination={result.destination}
           duration={result.duration}
+          fullName={result.fullName}
         />
       </Stack>
     </motion.div>

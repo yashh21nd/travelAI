@@ -6,6 +6,7 @@ import AccommodationBooking from './AccommodationBooking';
 import { brandColors } from '../theme';
 
 export default function TravelForm({ onResult }) {
+  const [fullName, setFullName] = useState('');
   const [destination, setDestination] = useState('');
   const [budget, setBudget] = useState('');
   const [duration, setDuration] = useState('');
@@ -24,6 +25,7 @@ export default function TravelForm({ onResult }) {
     setLoading(true);
     try {
       const requestData = {
+        fullName,
         destination,
         budget: parseFloat(budget),
         duration: parseInt(duration),
@@ -65,6 +67,26 @@ export default function TravelForm({ onResult }) {
       transition={{ duration: 0.5 }}
     >
       <Stack spacing={3}>
+        <TextField 
+          label="Full Name" 
+          value={fullName} 
+          onChange={e => setFullName(e.target.value)} 
+          required 
+          fullWidth 
+          helperText="Enter your full name for the itinerary"
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              '&:hover fieldset': {
+                borderColor: brandColors.primary.main,
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: brandColors.primary.main,
+              }
+            }
+          }}
+        />
+        
         <TextField 
           label="Your Current Location" 
           value={userLocation} 
