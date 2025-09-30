@@ -1,35 +1,32 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, Box, Typography, Alert, CircularProgress,
-  Card, CardContent, InputAdornment
+  Button, Box, Typography, Alert, CircularProgress,
+  Card, CardContent
 } from '@mui/material';
-import { Email, Send, CheckCircle, AttachFile, Download } from '@mui/icons-material';
+import { Download, CheckCircle, AttachFile } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
 export default function EmailItineraryDialog({ open, onClose, itinerary, destination, duration }) {
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [fileName, setFileName] = useState('');
 
-  const handleSendEmail = async () => {
-    if (!email || !email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
+  const handleDownloadPDF = async () => {
     setLoading(true);
     setError('');
 
     try {
-      // Use environment variable for API URL, fallback to local development
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      console.log('📄 Generating PDF for download...');
+      
+      // Call the backend to generate PDF
       const response = await axios.post(`${apiUrl}/api/send-itinerary`, {
-        email,
+        email: 'download@travelai.com', // Dummy email for PDF generation
         itinerary,
         destination,
         duration,
@@ -43,45 +40,61 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
         setTimeout(() => {
           onClose();
           setSuccess(false);
-          setEmail('');
-        }, 3000);
-      } else if (response.data.downloadAvailable) {
-        // Email failed but PDF is available for download
-        setError(response.data.message || 'Email failed but your PDF is ready for download!');
-        setDownloadUrl(response.data.downloadUrl);
-        setFileName(response.data.fileName);
+        }, 2000);
+      } else if (response.data.downloadAvailable || response.data.downloadUrl) {
+        // PDF is available for download
+        const downloadLink = response.data.downloadUrl;
+        const pdfFileName = response.data.fileName;
+        
+        // Create download link and trigger download
+        const fullDownloadUrl = `${apiUrl}${downloadLink}`;
+        
+        const link = document.createElement('a');
+        link.href = fullDownloadUrl;
+        link.download = pdfFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+          setSuccess(false);
+        }, 2000);
       } else {
-        setError(response.data.error || response.data.message || 'Email service temporarily unavailable. Please try again later.');
+        setError(response.data.error || response.data.message || 'Failed to generate PDF. Please try again.');
       }
     } catch (error) {
-      console.error('Error sending email:', error);
-      console.error('Full error details:', JSON.stringify(error, null, 2));
+      console.error('Error generating PDF:', error);
       
-      // More detailed and user-friendly error handling
       if (error.response && error.response.data) {
-        console.error('Server error response:', error.response.data);
         const errorData = error.response.data;
-        const errorMsg = errorData.error || errorData.message || errorData.suggestion || 'Unknown server error';
         
-        console.log('Error message extracted:', errorMsg);
-        
-        if (errorMsg.includes('authentication') || errorMsg.includes('credentials') || errorMsg.includes('EAUTH')) {
-          setError('Gmail authentication failed. Email service needs reconfiguration.');
-        } else if (errorMsg.includes('connection') || errorMsg.includes('network') || errorMsg.includes('ECONNECTION')) {
-          setError('Network connection issue. Please check your internet and try again.');
-        } else if (errorMsg.includes('timeout')) {
-          setError('Email sending timeout. Gmail servers may be slow - try again.');
+        if (errorData.downloadAvailable || errorData.downloadUrl) {
+          const downloadLink = errorData.downloadUrl;
+          const pdfFileName = errorData.fileName;
+          
+          const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+          const fullDownloadUrl = `${apiUrl}${downloadLink}`;
+          
+          const link = document.createElement('a');
+          link.href = fullDownloadUrl;
+          link.download = pdfFileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          setSuccess(true);
+          setTimeout(() => {
+            onClose();
+            setSuccess(false);
+          }, 2000);
         } else {
-          setError(`Email failed: ${errorMsg}`);
+          const errorMsg = errorData.error || errorData.message || 'Unknown server error';
+          setError(`PDF generation failed: ${errorMsg}`);
         }
-      } else if (error.code === 'ECONNABORTED') {
-        setError('Request timeout. Please check your internet connection and try again.');
-      } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-        setError('Unable to connect to email service. The server might be temporarily down. Please try again in a few minutes.');
-      } else if (error.message.includes('timeout')) {
-        setError('Request timed out. Please try again.');
       } else {
-        setError('Email service is temporarily unavailable. Please save your itinerary and try again later.');
+        setError('PDF generation service is temporarily unavailable. Please try again later.');
       }
     } finally {
       setLoading(false);
@@ -91,11 +104,8 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
   const handleClose = () => {
     if (!loading) {
       onClose();
-      setEmail('');
       setError('');
       setSuccess(false);
-      setDownloadUrl('');
-      setFileName('');
     }
   };
 
@@ -116,13 +126,13 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
         pb: 3
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-          <Email sx={{ fontSize: 28 }} />
+          <Download sx={{ fontSize: 28 }} />
           <Typography variant="h5" fontWeight={700}>
-            Email Your Itinerary
+            Download Your Itinerary
           </Typography>
         </Box>
         <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-          Receive your detailed {destination} travel plan via email
+          Get your detailed {destination} travel plan as a professional PDF
         </Typography>
       </DialogTitle>
 
@@ -137,13 +147,13 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
               <CardContent sx={{ textAlign: 'center', py: 4 }}>
                 <CheckCircle sx={{ fontSize: 64, color: '#2E7D32', mb: 2 }} />
                 <Typography variant="h6" fontWeight={700} color="#2E7D32" gutterBottom>
-                  Email Sent Successfully! 🎉
+                  PDF Downloaded Successfully! 🎉
                 </Typography>
                 <Typography variant="body2" color="#424242" sx={{ mb: 2 }}>
-                  Your itinerary has been sent to <strong>{email}</strong>
+                  Your itinerary PDF has been downloaded to your device
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Check your inbox for the complete travel document with all location links and restaurant recommendations.
+                  Check your downloads folder for the complete travel document with all location links and restaurant recommendations.
                 </Typography>
               </CardContent>
             </Card>
@@ -151,13 +161,13 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
         ) : (
           <Box>
             <Typography variant="h6" fontWeight={600} color="#2E7D32" gutterBottom>
-              📧 Get Your Complete Travel Document
+              � Get Your Complete Travel Document
             </Typography>
             
             <Card sx={{ mb: 3, bgcolor: '#F1F8E9' }}>
               <CardContent>
                 <Typography variant="subtitle2" fontWeight={600} color="#2E7D32" gutterBottom>
-                  📎 What you'll receive:
+                  📎 What you'll get:
                 </Typography>
                 <Box component="ul" sx={{ m: 0, pl: 2, color: '#424242' }}>
                   <li>📋 Complete day-by-day itinerary with specific timings</li>
@@ -165,67 +175,14 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
                   <li>🗺️ Direct location links for easy navigation</li>
                   <li>💰 Detailed budget breakdown</li>
                   <li>🚗 Transportation guide for each day</li>
-                  <li>📄 Downloadable text document for offline use</li>
+                  <li>📄 Professional PDF document for printing/sharing</li>
                 </Box>
               </CardContent>
             </Card>
 
-            <TextField
-              fullWidth
-              label="Your Email Address"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email to receive the itinerary"
-              disabled={loading}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Email color="action" />
-                  </InputAdornment>
-                ),
-                endAdornment: loading && (
-                  <InputAdornment position="end">
-                    <CircularProgress size={20} />
-                  </InputAdornment>
-                )
-              }}
-              sx={{
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  '&:hover fieldset': {
-                    borderColor: '#81C784',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#66BB6A',
-                  },
-                },
-              }}
-            />
-
             {error && (
-              <Alert severity={downloadUrl ? "warning" : "error"} sx={{ mb: 2 }}>
+              <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
-                {downloadUrl && (
-                  <Box sx={{ mt: 1 }}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<Download />}
-                      href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${downloadUrl}`}
-                      download={fileName}
-                      sx={{
-                        background: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)',
-                        color: 'white',
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #F57C00 0%, #E65100 100%)',
-                        }
-                      }}
-                    >
-                      Download PDF Instead
-                    </Button>
-                  </Box>
-                )}
               </Alert>
             )}
 
@@ -240,8 +197,8 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
                 <Typography variant="body2" color="#424242">
                   <strong>Destination:</strong> {destination}<br/>
                   <strong>Duration:</strong> {duration} days<br/>
-                  <strong>Format:</strong> Professional text document with all links<br/>
-                  <strong>File size:</strong> ~5-15KB (very small for easy download)
+                  <strong>Format:</strong> Professional PDF with clickable links<br/>
+                  <strong>File size:</strong> ~500KB-2MB (optimized for all devices)
                 </Typography>
               </CardContent>
             </Card>
@@ -260,9 +217,9 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
           </Button>
           <Button
             variant="contained"
-            onClick={handleSendEmail}
-            disabled={loading || !email}
-            startIcon={loading ? <CircularProgress size={16} /> : <Send />}
+            onClick={handleDownloadPDF}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={16} /> : <Download />}
             sx={{
               background: 'linear-gradient(135deg, #81C784 0%, #66BB6A 100%)',
               '&:hover': {
@@ -273,7 +230,7 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
               }
             }}
           >
-            {loading ? 'Sending...' : 'Send Itinerary'}
+            {loading ? 'Generating PDF...' : 'Download PDF'}
           </Button>
         </DialogActions>
       )}

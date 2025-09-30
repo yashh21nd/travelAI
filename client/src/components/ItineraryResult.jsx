@@ -100,16 +100,30 @@ export default function ItineraryResult({ result, onBack }) {
     
     if (currentDay) days.push(currentDay);
     
+    // Remove duplicates based on dayNumber
+    const uniqueDays = [];
+    const seenDayNumbers = new Set();
+    
+    for (const day of days) {
+      if (!seenDayNumbers.has(day.dayNumber)) {
+        seenDayNumbers.add(day.dayNumber);
+        uniqueDays.push(day);
+      }
+    }
+    
+    // Sort days by dayNumber to ensure correct order
+    uniqueDays.sort((a, b) => a.dayNumber - b.dayNumber);
+    
     // Add nightlife recommendations based on travel type
-    days.forEach(day => {
+    uniqueDays.forEach(day => {
       if (day.nightlife.length === 0 && (result.travelWith === 'friends' || result.travelWith === 'couple' || result.travelWith === 'solo')) {
         day.nightlife = generateNightlifeRecommendations(result.destination, result.travelWith);
       }
     });
     
     // If no structured days found, create a single day from all content
-    if (days.length === 0) {
-      days.push({
+    if (uniqueDays.length === 0) {
+      uniqueDays.push({
         dayNumber: 1,
         title: 'Your Travel Itinerary',
         activities: lines.slice(0, Math.ceil(lines.length * 0.6)).map(line => ({
@@ -131,7 +145,7 @@ export default function ItineraryResult({ result, onBack }) {
       });
     }
     
-    return days;
+    return uniqueDays;
   };
 
   // Helper functions
