@@ -1169,8 +1169,21 @@ app.post('/api/send-itinerary', async (req, res) => {
     console.log('📧 Environment check:', {
       hasEmailUser: !!process.env.EMAIL_USER,
       hasEmailPassword: !!process.env.EMAIL_PASSWORD,
+      emailUserValue: process.env.EMAIL_USER,
+      passwordLength: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.length : 0,
       isProduction: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com')
     });
+    
+    // Test transporter configuration
+    if (transporter && transporter.options) {
+      console.log('📧 Transporter config:', {
+        service: transporter.options.service,
+        host: transporter.options.host,
+        port: transporter.options.port,
+        secure: transporter.options.secure,
+        authUser: transporter.options.auth?.user
+      });
+    }
     
     if (!email || !itinerary) {
       return res.status(400).json({ error: 'Email and itinerary are required' });
@@ -1186,6 +1199,33 @@ app.post('/api/send-itinerary', async (req, res) => {
     console.log('📄 Creating PDF document...');
     const { fileName, filePath } = await createItineraryDocument(itinerary, destination, duration);
     console.log('📄 PDF created:', fileName);
+    
+    // Test Gmail connection before sending
+    try {
+      console.log('🔍 Testing Gmail connection...');
+      if (transporter.verify) {
+        await transporter.verify();
+        console.log('✅ Gmail connection verified successfully');
+      } else {
+        console.log('⚠️ Transporter verify method not available (development mode)');
+      }
+    } catch (verifyError) {
+      console.error('❌ Gmail connection test failed:', verifyError.message);
+      console.error('❌ Verify error details:', {
+        code: verifyError.code,
+        command: verifyError.command,
+        response: verifyError.response
+      });
+      
+      // Return early if connection fails
+      return res.status(500).json({
+        success: false,
+        error: 'Gmail connection failed',
+        message: verifyError.message,
+        code: verifyError.code,
+        suggestion: 'Check your Gmail app password and account settings'
+      });
+    }
     
     // Check if file exists
     if (!fs.existsSync(filePath)) {
