@@ -58,6 +58,19 @@ app.use((req, res, next) => {
   }
 });
 
+// Simple health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    email: {
+      configured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD),
+      user: process.env.EMAIL_USER || 'not set',
+      passwordLength: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.length : 0
+    }
+  });
+});
+
 // Root endpoint - Health check
 app.get('/', (req, res) => {
   res.json({

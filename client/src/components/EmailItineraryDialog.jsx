@@ -48,16 +48,24 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
       }
     } catch (error) {
       console.error('Error sending email:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
       
       // More detailed and user-friendly error handling
       if (error.response && error.response.data) {
-        const errorMsg = error.response.data.error || error.response.data.message;
-        if (errorMsg.includes('authentication') || errorMsg.includes('credentials')) {
-          setError('Email service configuration issue. Please contact support.');
-        } else if (errorMsg.includes('connection') || errorMsg.includes('network')) {
+        console.error('Server error response:', error.response.data);
+        const errorData = error.response.data;
+        const errorMsg = errorData.error || errorData.message || errorData.suggestion || 'Unknown server error';
+        
+        console.log('Error message extracted:', errorMsg);
+        
+        if (errorMsg.includes('authentication') || errorMsg.includes('credentials') || errorMsg.includes('EAUTH')) {
+          setError('Gmail authentication failed. Email service needs reconfiguration.');
+        } else if (errorMsg.includes('connection') || errorMsg.includes('network') || errorMsg.includes('ECONNECTION')) {
           setError('Network connection issue. Please check your internet and try again.');
+        } else if (errorMsg.includes('timeout')) {
+          setError('Email sending timeout. Gmail servers may be slow - try again.');
         } else {
-          setError(errorMsg || 'Failed to send email. Please try again.');
+          setError(`Email failed: ${errorMsg}`);
         }
       } else if (error.code === 'ECONNABORTED') {
         setError('Request timeout. Please check your internet connection and try again.');
