@@ -49,13 +49,13 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   
-  // Handle preflight requests
+  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
-    console.log(`✅ Handling OPTIONS preflight request from ${origin}`);
-    res.sendStatus(200);
-  } else {
-    next();
+    console.log('🔍 Handling OPTIONS preflight request for:', req.path);
+    return res.status(200).end();
   }
+  
+  next();
 });
 
 // Simple health check endpoint
