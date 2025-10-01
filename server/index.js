@@ -856,7 +856,7 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
       <div class="day-container">
         <div class="day-header">
           <div class="day-title">
-            � Day Total: ₹ ${generateDayTotal()} | �📅 ${day.title}
+            📅 ${day.title}
           </div>
           <div class="day-meta">
             Day ${day.day} of ${duration}
@@ -932,10 +932,7 @@ function getDefaultDayTitle(dayNumber) {
   return titles[(dayNumber - 1) % titles.length];
 }
 
-// Helper function to generate realistic day totals (temporary - will be removed)
-function generateDayTotal() {
-  return '0'; // Placeholder since day totals were requested to be removed
-}
+
 
 
 
