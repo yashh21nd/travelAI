@@ -734,7 +734,7 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
 }
 
 // Function to format itinerary content for professional structured PDF display
-function formatStructuredItineraryForPDF(itinerary, duration) {
+function formatStructuredItineraryForPDF(itinerary, duration, destination = '') {
   const lines = itinerary.split('\n').filter(line => line.trim());
   let html = '';
   let currentDay = 0;
@@ -884,19 +884,31 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
     day.activities.forEach((activity) => {
       const typeClass = `type-${activity.type}`;
       
-      // Enhanced Google Maps URL generation
+      // Enhanced Google Maps URL generation with destination context
       let mapUrl = '';
       let locationText = '';
       
       if (activity.location) {
+        locationText = activity.location;
+        
+        // Get the destination from the outer scope to add context
+        const destinationContext = destination || '';
+        
         // Clean location for better map results
         const cleanLocation = activity.location
           .replace(/[^\w\s,.-]/g, '') // Remove special chars except common ones
           .trim();
         
-        // Create multiple map URL options for better compatibility
-        mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanLocation)}`;
-        locationText = activity.location;
+        // Create a more specific search query with destination context
+        let searchQuery = cleanLocation;
+        
+        // Add destination context if the location doesn't already include it
+        if (!cleanLocation.toLowerCase().includes(destinationContext.toLowerCase()) && destinationContext) {
+          searchQuery = `${cleanLocation}, ${destinationContext}`;
+        }
+        
+        // Use the standard Google Maps search URL
+        mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
       }
       
       // Also try to extract location from title or description if not found
@@ -913,7 +925,8 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
         const hasLocationKeyword = locationKeywords.some(keyword => searchText.includes(keyword));
         
         if (hasLocationKeyword) {
-          const searchQuery = activity.title || activity.description;
+          const destinationContext = destination || '';
+          const searchQuery = `${activity.title}, ${destinationContext}`;
           mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
           locationText = activity.title;
         }
@@ -1626,7 +1639,7 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
         
         <!-- Structured Itinerary -->
         <div class="itinerary-section">
-            ${formatStructuredItineraryForPDF(cleanItinerary, duration)}
+            ${formatStructuredItineraryForPDF(cleanItinerary, duration, destination)}
         </div>
         
         <!-- Professional Footer -->

@@ -14,10 +14,17 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
   const [error, setError] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [fileName, setFileName] = useState('');
+  const [showSlowMessage, setShowSlowMessage] = useState(false);
 
   const handleDownloadPDF = async () => {
     setLoading(true);
     setError('');
+    setShowSlowMessage(false);
+
+    // Set up a timer to show slow loading message after 10 seconds
+    const slowLoadingTimer = setTimeout(() => {
+      setShowSlowMessage(true);
+    }, 10000);
 
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -98,7 +105,9 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
         setError('PDF generation service is temporarily unavailable. Please try again later.');
       }
     } finally {
+      clearTimeout(slowLoadingTimer);
       setLoading(false);
+      setShowSlowMessage(false);
     }
   };
 
@@ -185,6 +194,23 @@ export default function EmailItineraryDialog({ open, onClose, itinerary, destina
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
+            )}
+
+            {showSlowMessage && loading && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    🗺️ <strong>Fetching precise location data...</strong>
+                  </Typography>
+                  <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+                    We're gathering accurate Google Maps coordinates and restaurant details to ensure your PDF has clickable, working location links. This may take a bit longer but ensures the best travel experience! ✨
+                  </Typography>
+                </Alert>
+              </motion.div>
             )}
 
             <Card sx={{ bgcolor: 'rgba(129, 199, 132, 0.1)', border: '1px solid #C8E6C9' }}>
