@@ -109,8 +109,26 @@ const ContactPage = () => {
     const loadingToast = toast.loading('Sending your message...');
     
     try {
-      // Use your backend API endpoint
-      const response = await fetch('/api/contact', {
+      // Use your backend API endpoint - try different URLs for better compatibility
+      let apiUrl = '/api/contact';
+      
+      // If running in development and proxy fails, try the full URL
+      if (process.env.NODE_ENV === 'development') {
+        // First try the proxy URL, then fallback to direct URL
+        try {
+          const testResponse = await fetch('/api/contact-test');
+          if (!testResponse.ok) {
+            apiUrl = 'http://localhost:5000/api/contact';
+          }
+        } catch (proxyError) {
+          console.log('Proxy failed, using direct URL');
+          apiUrl = 'http://localhost:5000/api/contact';
+        }
+      }
+      
+      console.log('Submitting to:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

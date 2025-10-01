@@ -2044,6 +2044,11 @@ app.get('/api/contact', (req, res) => {
   });
 });
 
+// Add a simple test endpoint
+app.get('/api/contact-test', (req, res) => {
+  res.json({ message: 'Contact API is working!', timestamp: new Date().toISOString() });
+});
+
 app.post('/api/contact', async (req, res) => {
   console.log('📧 Contact endpoint hit with method:', req.method);
   console.log('📧 Request body:', req.body);
