@@ -700,7 +700,7 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
     console.log('📧 Gmail Account:', process.env.EMAIL_USER);
     console.log('📧 Password Type:', process.env.EMAIL_PASSWORD ? (process.env.EMAIL_PASSWORD.includes(' ') ? 'App Password (16 chars with spaces) ✅' : 'Regular Password (may need App Password) ⚠️') : 'Not Set ❌');
     
-    transporter = nodemailer.createTransporter({
+    transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
