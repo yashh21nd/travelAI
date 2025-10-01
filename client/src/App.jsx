@@ -51,6 +51,7 @@ export default function App() {
               guests={2}
               currency="USD"
               tripDuration={3}
+              onClose={() => setCurrentPage('home')}
             />
           </Box>
         );
