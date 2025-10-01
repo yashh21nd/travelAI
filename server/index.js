@@ -932,6 +932,11 @@ function getDefaultDayTitle(dayNumber) {
   return titles[(dayNumber - 1) % titles.length];
 }
 
+// Helper function to generate realistic day totals (temporary - will be removed)
+function generateDayTotal() {
+  return '0'; // Placeholder since day totals were requested to be removed
+}
+
 
 
 // Create professional HTML document from itinerary
