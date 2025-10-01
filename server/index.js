@@ -672,6 +672,10 @@ let transporter;
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_USER !== 'your-email@gmail.com') {
   console.log('Initializing email service with user:', process.env.EMAIL_USER);
   
+  // Detect if running on cloud platform
+  const isCloudPlatform = process.env.RENDER || process.env.HEROKU || process.env.VERCEL || process.env.NETLIFY;
+  console.log('🌍 Environment:', isCloudPlatform ? 'Cloud Platform Detected' : 'Local Development');
+  
   // Check if we should use SMTP2GO as fallback
   const useSmtp2Go = process.env.SMTP2GO_API_KEY || false;
   
@@ -696,7 +700,7 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
     console.log('📧 Gmail Account:', process.env.EMAIL_USER);
     console.log('📧 Password Type:', process.env.EMAIL_PASSWORD ? (process.env.EMAIL_PASSWORD.includes(' ') ? 'App Password (16 chars with spaces) ✅' : 'Regular Password (may need App Password) ⚠️') : 'Not Set ❌');
     
-    transporter = nodemailer.createTransport({
+    transporter = nodemailer.createTransporter({
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
@@ -708,25 +712,52 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
         rejectUnauthorized: false,
         servername: 'smtp.gmail.com'
       },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
+      // Enhanced connection settings for cloud deployment
+      connectionTimeout: 60000, // 60 seconds
+      greetingTimeout: 30000,   // 30 seconds
+      socketTimeout: 60000,     // 60 seconds
       requireTLS: true,
-      debug: false,
-      logger: false
+      pool: true,               // Use connection pooling
+      maxConnections: 3,        // Limit concurrent connections
+      maxMessages: 100,         // Messages per connection
+      rateLimit: 10,           // Emails per second
+      debug: process.env.NODE_ENV === 'development',
+      logger: process.env.NODE_ENV === 'development'
     });
   }
   
-  // Simple connection test without blocking startup
+  // Enhanced connection test with retry logic for production
   setTimeout(async () => {
-    try {
-      console.log('🔍 Testing email service connection...');
-      await transporter.verify();
-      console.log('✅ Email service ready');
-    } catch (error) {
-      console.log('⚠️ Email verification failed, but service will still attempt sending:', error.message);
+    console.log('🔍 Testing email service connection...');
+    
+    // Try verification with timeout and retry
+    let retries = 3;
+    let verified = false;
+    
+    while (retries > 0 && !verified) {
+      try {
+        const verifyPromise = transporter.verify();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Verification timeout')), 15000)
+        );
+        
+        await Promise.race([verifyPromise, timeoutPromise]);
+        console.log('✅ Email service ready and verified');
+        verified = true;
+      } catch (error) {
+        retries--;
+        console.log(`⚠️ Email verification attempt failed (${3-retries}/3):`, error.message);
+        
+        if (retries > 0) {
+          console.log('🔄 Retrying email verification in 10 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        } else {
+          console.log('⚠️ Email verification failed after 3 attempts, but service will still attempt sending');
+          console.log('💡 This is normal on cloud platforms like Render - emails should still work');
+        }
+      }
     }
-  }, 5000);
+  }, 2000);
 } else {
   // Development mode - Create test account or mock transporter
   transporter = {

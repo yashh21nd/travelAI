@@ -108,22 +108,24 @@ const ContactPage = () => {
     // Show loading toast
     const loadingToast = toast.loading('Sending your message...');
     
-    try {
-      // Use direct backend URL to avoid proxy issues
-      const apiUrl = 'http://localhost:5000/api/contact';
-      console.log('Submitting directly to:', apiUrl);
-      
-      // Test connectivity first
-      try {
-        const testResponse = await fetch('http://localhost:5000/api/test-post', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ test: 'connectivity' })
-        });
-        console.log('Test POST response:', testResponse.status, testResponse.ok);
-      } catch (testError) {
-        console.log('Server connectivity test failed:', testError);
+    // Dynamic API URL configuration with fallbacks
+    const getApiUrl = () => {
+      // Use proxy configuration from package.json in development
+      if (process.env.NODE_ENV === 'development') {
+        return '/api/contact'; // This will use the proxy to localhost:5000
       }
+      // If in production on localhost (testing)
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:5000/api/contact';
+      }
+      // If deployed, use relative URL (will use same domain)
+      return '/api/contact';
+    };
+    
+    try {
+      const apiUrl = getApiUrl();
+      console.log('Submitting to API URL:', apiUrl);
+      console.log('Current location:', window.location.href);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -185,13 +187,31 @@ const ContactPage = () => {
       console.log('Error details:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        apiUrl: getApiUrl(),
+        currentURL: window.location.href,
+        errorType: error.constructor.name
       });
       
       toast.dismiss(loadingToast);
       
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to send message: ';
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = '🔧 Connection Error: Backend server not reachable. Please ensure:\n• Server is running: "cd server && node index.js"\n• Server shows "✅ Email service ready"';
+      } else if (error.message.includes('NetworkError') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+        errorMessage = '🔧 Server Not Running: Please start the backend server:\n• Open terminal\n• Run: cd server\n• Run: node index.js\n• Look for "🚀 TravelAI Backend Server running on port 5000"';
+      } else if (error.message.includes('CORS')) {
+        errorMessage = '🔧 CORS Error: Server access blocked. Check CORS configuration.';
+      } else if (error.message.includes('fetch')) {
+        errorMessage = '🔧 Network Error: Check if backend server is running on localhost:5000';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred';
+      }
+      
       // Show error message without any backup redirection
-      toast.error(`Failed to send message: ${error.message}. Please try again or contact us directly.`, {
+      toast.error(errorMessage, {
         duration: 8000,
         icon: '❌',
       });
