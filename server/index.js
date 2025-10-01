@@ -680,7 +680,10 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
     });
   } else {
     // Direct SMTP configuration (bypassing Gmail service detection)
-    console.log('Using direct SMTP configuration');
+    console.log('Using direct SMTP configuration for Gmail');
+    console.log('📧 Gmail Account:', process.env.EMAIL_USER);
+    console.log('📧 Password Type:', process.env.EMAIL_PASSWORD ? (process.env.EMAIL_PASSWORD.includes(' ') ? 'App Password (16 chars with spaces) ✅' : 'Regular Password (may need App Password) ⚠️') : 'Not Set ❌');
+    
     transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
@@ -2195,6 +2198,16 @@ app.post('/api/contact', async (req, res) => {
       
     } catch (emailError) {
       console.error('❌ Email sending failed:', emailError.message);
+      
+      // Provide specific guidance for Gmail authentication errors
+      let errorGuidance = '';
+      if (emailError.message.includes('Invalid login') || emailError.message.includes('BadCredentials')) {
+        errorGuidance = ' | Tip: Gmail account may need 2FA + App Password. See EMAIL_SETUP_GUIDE.md';
+      } else if (emailError.message.includes('authentication')) {
+        errorGuidance = ' | Tip: Check Gmail credentials and 2FA settings';
+      }
+      
+      console.log('📧 Email Error Details:', emailError.code, errorGuidance);
       
       // Even if emails fail, log the contact form submission
       res.json({

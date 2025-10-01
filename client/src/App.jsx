@@ -17,6 +17,7 @@ import AboutUsPage from './components/AboutUsPage';
 import ContactPage from './components/ContactPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import DeveloperPage from './components/DeveloperPage';
+import AccommodationBooking from './components/AccommodationBooking';
 import { Toaster } from 'react-hot-toast';
 import { brandColors } from './theme';
 
@@ -40,6 +41,19 @@ export default function App() {
         return <PrivacyPolicyPage />;
       case 'developer':
         return <DeveloperPage />;
+      case 'accommodation':
+        return (
+          <Box sx={{ py: 4 }}>
+            <AccommodationBooking 
+              destination="Sample Destination"
+              checkIn="2025-10-15"
+              checkOut="2025-10-18"
+              guests={2}
+              currency="USD"
+              tripDuration={3}
+            />
+          </Box>
+        );
       case 'home':
       default:
         return (

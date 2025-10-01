@@ -172,6 +172,7 @@ const ProfessionalHeader = ({ onNavigate, currentPage }) => {
 
   const menuItems = [
     { label: 'Plan Trip', href: 'home' },
+    { label: 'Accommodation', href: 'accommodation' },
     { label: 'About Us', href: 'about' },
     { label: 'Contact', href: 'contact' },
     { label: 'Privacy & Terms', href: 'privacy' }
