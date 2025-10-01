@@ -794,11 +794,39 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
           title = remaining;
         }
         
-        // Extract location if present
-        const locationMatch = title.match(/at\s+(.+?)(?:\s*-|\s*\(|$)/i);
-        if (locationMatch) {
-          location = locationMatch[1].trim();
-          title = title.replace(locationMatch[0], '').trim();
+        // Enhanced location extraction from multiple patterns
+        const locationPatterns = [
+          /at\s+([^-()]+?)(?:\s*[-())]|$)/i,
+          /in\s+([^-()]+?)(?:\s*[-())]|$)/i,
+          /visit\s+([^-()]+?)(?:\s*[-())]|$)/i,
+          /to\s+([^-()]+?)(?:\s*[-())]|$)/i,
+          /near\s+([^-()]+?)(?:\s*[-())]|$)/i
+        ];
+        
+        for (const pattern of locationPatterns) {
+          const match = remaining.match(pattern);
+          if (match && !location) {
+            location = match[1].trim();
+            break;
+          }
+        }
+        
+        // Also check for well-known landmarks and places in description
+        const landmarkPatterns = [
+          /(Times Square|Central Park|Statue of Liberty|Brooklyn Bridge|Empire State Building|One World Trade Center)/i,
+          /(Eiffel Tower|Louvre Museum|Notre Dame|Arc de Triomphe|Champs-Élysées)/i,
+          /(Big Ben|Tower of London|Buckingham Palace|Westminster Abbey|London Eye)/i,
+          /(Tokyo Tower|Shibuya Crossing|Senso-ji Temple|Mount Fuji|Golden Pavilion)/i,
+          /(Red Square|Kremlin|St\. Basil's Cathedral|Hermitage Museum)/i,
+          /(Colosseum|Vatican City|Trevi Fountain|Spanish Steps|Pantheon)/i
+        ];
+        
+        for (const pattern of landmarkPatterns) {
+          const match = remaining.match(pattern);
+          if (match && !location) {
+            location = match[1].trim();
+            break;
+          }
         }
         
         currentDayData.activities.push({
@@ -820,32 +848,11 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
   // If no structured days found, create default structure
   if (days.length === 0) {
     for (let d = 1; d <= duration; d++) {
+      const dayActivities = getDefaultActivitiesForDestination(destination, d);
       days.push({
         day: d,
         title: `Day ${d} - ${getDefaultDayTitle(d)}`,
-        activities: [
-          {
-            time: '9:00 AM',
-            type: 'morning',
-            title: 'Explore Local Attractions',
-            description: 'Begin your day with sightseeing and cultural exploration',
-            location: 'City Center'
-          },
-          {
-            time: '1:00 PM', 
-            type: 'afternoon',
-            title: 'Local Cuisine Experience',
-            description: 'Enjoy authentic local food and cultural dining',
-            location: 'Recommended Restaurant'
-          },
-          {
-            time: '7:00 PM',
-            type: 'evening',
-            title: 'Evening Entertainment',
-            description: 'Relax and enjoy evening activities',
-            location: 'Entertainment District'
-          }
-        ]
+        activities: dayActivities
       });
     }
   }
@@ -876,7 +883,41 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
     
     day.activities.forEach((activity) => {
       const typeClass = `type-${activity.type}`;
-      const mapUrl = activity.location ? `https://maps.google.com/maps?q=${encodeURIComponent(activity.location)}` : '';
+      
+      // Enhanced Google Maps URL generation
+      let mapUrl = '';
+      let locationText = '';
+      
+      if (activity.location) {
+        // Clean location for better map results
+        const cleanLocation = activity.location
+          .replace(/[^\w\s,.-]/g, '') // Remove special chars except common ones
+          .trim();
+        
+        // Create multiple map URL options for better compatibility
+        mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanLocation)}`;
+        locationText = activity.location;
+      }
+      
+      // Also try to extract location from title or description if not found
+      if (!mapUrl && (activity.title || activity.description)) {
+        const searchText = `${activity.title} ${activity.description}`.toLowerCase();
+        
+        // Look for common location indicators
+        const locationKeywords = [
+          'museum', 'park', 'tower', 'bridge', 'cathedral', 'palace', 'square', 
+          'temple', 'castle', 'market', 'restaurant', 'cafe', 'hotel', 'beach',
+          'downtown', 'center', 'district', 'quarter', 'street', 'avenue'
+        ];
+        
+        const hasLocationKeyword = locationKeywords.some(keyword => searchText.includes(keyword));
+        
+        if (hasLocationKeyword) {
+          const searchQuery = activity.title || activity.description;
+          mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
+          locationText = activity.title;
+        }
+      }
       
       html += `
             <tr>
@@ -889,9 +930,9 @@ function formatStructuredItineraryForPDF(itinerary, duration) {
               </td>
               <td>
                 ${activity.description ? `<div class="activity-description">${activity.description}</div>` : ''}
-                ${activity.location ? `
-                  <div class="activity-location">📍 ${activity.location}</div>
-                  <a href="${mapUrl}" class="google-link">View Location</a>
+                ${mapUrl ? `
+                  <div class="activity-location">📍 ${locationText}</div>
+                  <a href="${mapUrl}" target="_blank" class="google-link" title="Open ${locationText} in Google Maps">🗺️ View on Google Maps</a>
                 ` : ''}
               </td>
             </tr>`;
@@ -930,6 +971,76 @@ function getDefaultDayTitle(dayNumber) {
   ];
   
   return titles[(dayNumber - 1) % titles.length];
+}
+
+// Generate location-specific activities with real places
+function getDefaultActivitiesForDestination(destination, dayNumber) {
+  const dest = destination.toLowerCase();
+  
+  // Location-specific attractions and activities
+  const locationData = {
+    'new york': {
+      attractions: ['Times Square', 'Central Park', 'Statue of Liberty', 'Brooklyn Bridge', 'Empire State Building', 'High Line Park', 'One World Observatory'],
+      restaurants: ['Katz\'s Delicatessen', 'Joe\'s Pizza', 'The Halal Guys', 'Levain Bakery', 'Serendipity 3'],
+      areas: ['Manhattan', 'Brooklyn', 'Greenwich Village', 'SoHo', 'Chinatown']
+    },
+    'paris': {
+      attractions: ['Eiffel Tower', 'Louvre Museum', 'Notre-Dame Cathedral', 'Arc de Triomphe', 'Champs-Élysées', 'Montmartre', 'Seine River Cruise'],
+      restaurants: ['Café de Flore', 'L\'As du Fallafel', 'Breizh Café', 'Pierre Hermé', 'Angelina'],
+      areas: ['Marais District', 'Latin Quarter', 'Saint-Germain', 'Montparnasse', 'Le Marais']
+    },
+    'london': {
+      attractions: ['Big Ben', 'Tower of London', 'Buckingham Palace', 'London Eye', 'Westminster Abbey', 'Tower Bridge', 'British Museum'],
+      restaurants: ['Borough Market', 'Dishoom', 'Sketch', 'The Ivy', 'Fortnum & Mason'],
+      areas: ['Covent Garden', 'Camden Market', 'Notting Hill', 'Shoreditch', 'South Bank']
+    },
+    'tokyo': {
+      attractions: ['Tokyo Tower', 'Senso-ji Temple', 'Shibuya Crossing', 'Meiji Shrine', 'Tokyo Skytree', 'Tsukiji Fish Market', 'Imperial Palace'],
+      restaurants: ['Sushi Dai', 'Ramen Yokocho', 'Genki Sushi', 'Ichiran Ramen', 'Takoyaki Museum'],
+      areas: ['Shibuya', 'Harajuku', 'Ginza', 'Akihabara', 'Roppongi']
+    }
+  };
+  
+  // Default fallback data
+  const defaultData = {
+    attractions: ['City Center', 'Main Square', 'Historic District', 'Cultural Museum', 'Local Park', 'Scenic Viewpoint'],
+    restaurants: ['Local Restaurant', 'Traditional Cuisine', 'Popular Café', 'Street Food Market'],
+    areas: ['Downtown', 'Old Town', 'Cultural Quarter', 'Entertainment District']
+  };
+  
+  const data = locationData[dest] || defaultData;
+  
+  // Generate activities based on day number
+  const activities = [];
+  const attractionIndex = (dayNumber - 1) % data.attractions.length;
+  const restaurantIndex = (dayNumber - 1) % data.restaurants.length;
+  const areaIndex = (dayNumber - 1) % data.areas.length;
+  
+  activities.push({
+    time: '9:00 AM',
+    type: 'morning',
+    title: `Visit ${data.attractions[attractionIndex]}`,
+    description: 'Explore this iconic landmark and learn about its history and significance',
+    location: data.attractions[attractionIndex]
+  });
+  
+  activities.push({
+    time: '1:00 PM',
+    type: 'afternoon', 
+    title: `Lunch at ${data.restaurants[restaurantIndex]}`,
+    description: 'Experience authentic local cuisine and flavors',
+    location: data.restaurants[restaurantIndex]
+  });
+  
+  activities.push({
+    time: '7:00 PM',
+    type: 'evening',
+    title: `Evening in ${data.areas[areaIndex]}`,
+    description: 'Explore the local nightlife, shops, and evening entertainment',
+    location: data.areas[areaIndex]
+  });
+  
+  return activities;
 }
 
 
@@ -1304,19 +1415,33 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
         .google-link {
             display: inline-block;
             background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
-            color: #3182ce;
-            text-decoration: none;
-            padding: 3px 8px;
-            border-radius: 6px;
+            color: #3182ce !important;
+            text-decoration: underline;
+            padding: 4px 10px;
+            border-radius: 8px;
             font-size: 8pt;
-            font-weight: 500;
-            margin-top: 4px;
-            border: 1px solid #90cdf4;
+            font-weight: 600;
+            margin-top: 6px;
+            border: 2px solid #3182ce;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .google-link:hover {
+            background: #3182ce;
+            color: white !important;
+            text-decoration: none;
+        }
+        
+        .google-link:visited {
+            color: #3182ce !important;
         }
         
         .google-link::before {
-            content: "🗺️ ";
-            margin-right: 3px;
+            content: "";
+            margin-right: 0px;
         }
         
         /* Professional Footer with Terms */
