@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Container,
@@ -23,7 +23,6 @@ import {
 } from '@mui/icons-material';
 import { brandColors } from '../theme';
 import toast from 'react-hot-toast';
-import emailjs from '@emailjs/browser';
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -37,13 +36,6 @@ const ContactPage = () => {
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // 'success' | 'error'
-
-  // Initialize EmailJS
-  useEffect(() => {
-    // Initialize EmailJS with public key
-    emailjs.init('YOUR_PUBLIC_KEY'); // We'll use a demo service for now
-    console.log('EmailJS initialized');
-  }, []);
 
   // Email validation helper
   const isValidEmail = (email) => {
@@ -117,144 +109,71 @@ const ContactPage = () => {
     const loadingToast = toast.loading('Sending your message...');
     
     try {
-      // Prepare email data
-      const emailData = {
-        to_email: 'travelplanner.ai.service@gmail.com',
-        from_name: formData.name,
-        from_email: formData.email,
-        subject: `TravelAI Pro Contact: ${formData.subject}`,
-        inquiry_type: inquiryTypes.find(type => type.value === formData.inquiryType)?.label || formData.inquiryType,
-        message: formData.message,
-        timestamp: new Date().toLocaleString(),
-        website: window.location.origin
-      };
+      // Use your backend API endpoint
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+          inquiryType: formData.inquiryType
+        })
+      });
       
-      // Method 1: Try using FormSubmit service (no registration needed)
-      try {
-        const response = await fetch('https://formsubmit.co/travelplanner.ai.service@gmail.com', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            name: emailData.from_name,
-            email: emailData.from_email,
-            subject: emailData.subject,
-            message: `Contact Form Submission from TravelAI Pro Website
-
-═══════════════════════════════════════════════════════════════════════════════
-CONTACT DETAILS:
-═══════════════════════════════════════════════════════════════════════════════
-Name: ${emailData.from_name}
-Email: ${emailData.from_email}
-Inquiry Type: ${emailData.inquiry_type}
-Subject: ${formData.subject}
-
-═══════════════════════════════════════════════════════════════════════════════
-MESSAGE:
-═══════════════════════════════════════════════════════════════════════════════
-${emailData.message}
-
-═══════════════════════════════════════════════════════════════════════════════
-Submission Time: ${emailData.timestamp}
-Platform: TravelAI Pro Contact Form
-Website: ${emailData.website}
-═══════════════════════════════════════════════════════════════════════════════
-
-Please respond to this inquiry at: ${emailData.from_email}`,
-            _replyto: emailData.from_email,
-            _subject: emailData.subject,
-            _template: 'table'
-          })
+      const result = await response.json();
+      
+      if (response.ok) {
+        // Success
+        toast.dismiss(loadingToast);
+        toast.success('✅ Message sent successfully! We\'ll get back to you within 24 hours.', {
+          duration: 8000,
+          icon: '🚀',
         });
+        setSubmitStatus('success');
         
-        if (response.ok) {
-          // Success with FormSubmit
-          toast.dismiss(loadingToast);
-          toast.success('✅ Message sent successfully! You should receive it in your inbox within minutes.', {
-            duration: 8000,
-            icon: '🚀',
+        // Reset form after successful submission
+        setTimeout(() => {
+          setFormData({
+            name: '',
+            email: '',
+            subject: '',
+            message: '',
+            inquiryType: 'general'
           });
-          setSubmitStatus('success');
-        } else {
-          throw new Error('FormSubmit failed');
-        }
-      } catch (formSubmitError) {
-        console.log('FormSubmit failed, trying alternative method:', formSubmitError);
+          setSubmitStatus(null);
+        }, 2000);
         
-        // Method 2: Try Netlify Forms (if hosted on Netlify)
-        try {
-          const netlifyResponse = await fetch('/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              'form-name': 'contact',
-              'name': emailData.from_name,
-              'email': emailData.from_email,
-              'subject': emailData.subject,
-              'message': emailData.message,
-              'inquiry-type': emailData.inquiry_type
-            })
-          });
-          
-          if (netlifyResponse.ok) {
-            toast.dismiss(loadingToast);
-            toast.success('✅ Message sent via Netlify! Check your inbox.', {
-              duration: 6000,
-              icon: '📧',
-            });
-            setSubmitStatus('success');
-          } else {
-            throw new Error('Netlify forms failed');
-          }
-        } catch (netlifyError) {
-          console.log('Netlify failed, using mailto fallback:', netlifyError);
-          
-          // Method 3: Fallback to mailto (opens email client)
-          const emailSubject = encodeURIComponent(emailData.subject);
-          const emailBody = encodeURIComponent(
-            `Contact from: ${emailData.from_name} (${emailData.from_email})\n\n` +
-            `Inquiry Type: ${emailData.inquiry_type}\n` +
-            `Subject: ${formData.subject}\n\n` +
-            `Message:\n${emailData.message}\n\n` +
-            `Submitted: ${emailData.timestamp}\n` +
-            `Website: ${emailData.website}`
-          );
-          
-          const mailtoLink = `mailto:travelplanner.ai.service@gmail.com?subject=${emailSubject}&body=${emailBody}`;
-          window.open(mailtoLink, '_blank');
-          
-          toast.dismiss(loadingToast);
-          toast.success('📧 Email client opened! Please send the message to complete submission.', {
-            duration: 8000,
-            icon: '�',
-          });
-          setSubmitStatus('success');
-        }
+      } else {
+        throw new Error(result.message || 'Failed to send message');
       }
       
-      // Reset form after successful submission
-      setTimeout(() => {
-        setFormData({
-          name: '',
-          email: '',
-          subject: '',
-          message: '',
-          inquiryType: 'general'
-        });
-        setSubmitStatus(null);
-        
-        toast.success('Form reset! Thank you for contacting TravelAI Pro!', {
-          icon: '✅',
-          duration: 4000
-        });
-      }, 3000);
-      
     } catch (error) {
-      console.error('All email methods failed:', error);
+      console.error('Contact form error:', error);
       toast.dismiss(loadingToast);
-      toast.error('Failed to send message. Please try again or contact us directly at travelplanner.ai.service@gmail.com');
+      
+      // Fallback to mailto if backend fails
+      const emailSubject = encodeURIComponent(`TravelAI Pro Contact: ${formData.subject}`);
+      const inquiryTypeLabel = inquiryTypes.find(type => type.value === formData.inquiryType)?.label || formData.inquiryType;
+      const emailBody = encodeURIComponent(
+        `Contact from: ${formData.name} (${formData.email})\n\n` +
+        `Inquiry Type: ${inquiryTypeLabel}\n` +
+        `Subject: ${formData.subject}\n\n` +
+        `Message:\n${formData.message}\n\n` +
+        `Submitted: ${new Date().toLocaleString()}\n` +
+        `Website: ${window.location.origin}`
+      );
+      
+      const mailtoLink = `mailto:travelplanner.ai.service@gmail.com?subject=${emailSubject}&body=${emailBody}`;
+      window.open(mailtoLink, '_blank');
+      
+      toast.error('Unable to send via server. Opening email client as backup.', {
+        duration: 8000,
+        icon: '📧',
+      });
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
