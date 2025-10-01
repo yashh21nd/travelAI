@@ -109,24 +109,21 @@ const ContactPage = () => {
     const loadingToast = toast.loading('Sending your message...');
     
     try {
-      // Use your backend API endpoint - try different URLs for better compatibility
-      let apiUrl = '/api/contact';
+      // Use direct backend URL to avoid proxy issues
+      const apiUrl = 'http://localhost:5000/api/contact';
+      console.log('Submitting directly to:', apiUrl);
       
-      // If running in development and proxy fails, try the full URL
-      if (process.env.NODE_ENV === 'development') {
-        // First try the proxy URL, then fallback to direct URL
-        try {
-          const testResponse = await fetch('/api/contact-test');
-          if (!testResponse.ok) {
-            apiUrl = 'http://localhost:5000/api/contact';
-          }
-        } catch (proxyError) {
-          console.log('Proxy failed, using direct URL');
-          apiUrl = 'http://localhost:5000/api/contact';
-        }
+      // Test connectivity first
+      try {
+        const testResponse = await fetch('http://localhost:5000/api/test-post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ test: 'connectivity' })
+        });
+        console.log('Test POST response:', testResponse.status, testResponse.ok);
+      } catch (testError) {
+        console.log('Server connectivity test failed:', testError);
       }
-      
-      console.log('Submitting to:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -193,24 +190,10 @@ const ContactPage = () => {
       
       toast.dismiss(loadingToast);
       
-      // Fallback to mailto if backend fails
-      const emailSubject = encodeURIComponent(`TravelAI Pro Contact: ${formData.subject}`);
-      const inquiryTypeLabel = inquiryTypes.find(type => type.value === formData.inquiryType)?.label || formData.inquiryType;
-      const emailBody = encodeURIComponent(
-        `Contact from: ${formData.name} (${formData.email})\n\n` +
-        `Inquiry Type: ${inquiryTypeLabel}\n` +
-        `Subject: ${formData.subject}\n\n` +
-        `Message:\n${formData.message}\n\n` +
-        `Submitted: ${new Date().toLocaleString()}\n` +
-        `Website: ${window.location.origin}`
-      );
-      
-      const mailtoLink = `mailto:travelplanner.ai.service@gmail.com?subject=${emailSubject}&body=${emailBody}`;
-      window.open(mailtoLink, '_blank');
-      
-      toast.error('Unable to send via server. Opening email client as backup.', {
+      // Show error message without any backup redirection
+      toast.error(`Failed to send message: ${error.message}. Please try again or contact us directly.`, {
         duration: 8000,
-        icon: '📧',
+        icon: '❌',
       });
       setSubmitStatus('error');
     } finally {
