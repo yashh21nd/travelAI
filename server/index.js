@@ -932,20 +932,11 @@ function getDefaultDayTitle(dayNumber) {
   return titles[(dayNumber - 1) % titles.length];
 }
 
-// Helper function to generate realistic day totals
-function generateDayTotal() {
-  // Generate random day total between ₹8000 - ₹15000
-  const baseAmount = 8000;
-  const variation = Math.floor(Math.random() * 7000);
-  const total = baseAmount + variation;
-  
-  // Format with Indian number system
-  return total.toLocaleString('en-IN');
-}
+
 
 // Create professional HTML document from itinerary
 async function createItineraryDocument(itinerary, destination, duration, fullName = 'Guest') {
-  const fileName = `${destination.replace(/\s+/g, '_')}_${duration}days_itinerary.pdf`;
+  const fileName = `${destination.replace(/\s+/g, '_').toLowerCase()}_${duration}days_itinerary.pdf`;
   const filePath = path.join(__dirname, 'documents', fileName);
   
   // Ensure documents directory exists
@@ -1144,13 +1135,24 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
         
         /* Day Itinerary Tables */
         .itinerary-section {
-            padding: 30px;
+            padding: 20px;
         }
         
         .day-container {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             break-inside: avoid;
             page-break-inside: avoid;
+        }
+        
+        /* Compact layout for 7-day trips */
+        @media screen and (max-width: 768px) {
+            .day-container {
+                margin-bottom: 15px;
+            }
+            
+            .itinerary-section {
+                padding: 10px;
+            }
         }
         
         .day-header {
@@ -1386,31 +1388,60 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
         /* Print Optimizations */
         @media print {
             body {
-                font-size: 9pt;
-                line-height: 1.3;
+                font-size: 8pt;
+                line-height: 1.2;
             }
             
             .day-container {
-                page-break-before: always;
                 page-break-inside: avoid;
+                margin-bottom: 15px;
             }
             
-            .day-container:first-of-type {
-                page-break-before: auto;
+            /* Force 2-page layout for 7-day trips */
+            .day-container:nth-child(4) {
+                page-break-before: always;
             }
             
             .itinerary-table {
                 page-break-inside: avoid;
             }
             
+            .itinerary-table td {
+                padding: 8px;
+                font-size: 7pt;
+            }
+            
             .footer {
-                page-break-before: always;
+                page-break-before: auto;
+                margin-top: 10px;
             }
         }
         
         @page {
-            margin: 0.75in;
+            margin: 0.5in;
             size: A4;
+        }
+        
+        /* Mobile optimizations */
+        @media screen and (max-width: 768px) {
+            .overview-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+            
+            .itinerary-table th,
+            .itinerary-table td {
+                padding: 8px;
+                font-size: 8pt;
+            }
+            
+            .header {
+                padding: 15px 20px;
+            }
+            
+            .company-name {
+                font-size: 18pt;
+            }
         }
     </style>
 </head>

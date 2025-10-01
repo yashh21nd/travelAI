@@ -14,7 +14,6 @@ import {
 import {
   TravelExplore,
   Menu as MenuIcon,
-  Language,
   Business
 } from '@mui/icons-material';
 import { brandColors } from '../theme';
@@ -201,17 +200,6 @@ const ProfessionalHeader = ({ onNavigate, currentPage }) => {
 
           {/* User Actions - Simplified for Login-Free */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-            {/* Language Selector */}
-            <IconButton
-              size="small"
-              sx={{ 
-                color: brandColors.neutral[600],
-                '&:hover': { color: brandColors.primary.main }
-              }}
-            >
-              <Language fontSize="small" />
-            </IconButton>
-
             {/* Business/Partner Portal */}
             <IconButton
               size="small"
