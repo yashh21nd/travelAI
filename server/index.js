@@ -2036,48 +2036,6 @@ app.get('/api/download-itinerary/:filename', (req, res) => {
 });
 
 // Contact form API endpoint
-app.get('/api/contact', (req, res) => {
-  res.json({ 
-    message: 'Contact API is working! Use POST method to submit contact form.',
-    timestamp: new Date().toISOString(),
-    methods: ['POST']
-  });
-});
-
-// Add a simple test endpoint
-app.get('/api/contact-test', (req, res) => {
-  res.json({ message: 'Contact API is working!', timestamp: new Date().toISOString() });
-});
-
-// Simple POST test endpoint
-app.post('/api/test-post', (req, res) => {
-  console.log('📧 Test POST endpoint hit');
-  console.log('📧 Body received:', req.body);
-  res.json({ 
-    message: 'POST request successful!', 
-    receivedData: req.body,
-    timestamp: new Date().toISOString() 
-  });
-});
-
-// Handle all HTTP methods for contact endpoint
-app.all('/api/contact', (req, res, next) => {
-  console.log(`📧 Contact route hit: ${req.method} ${req.url}`);
-  console.log('📧 Headers:', req.headers);
-  console.log('📧 Body:', req.body);
-  
-  if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      error: `Method ${req.method} not allowed. Only POST requests are accepted.`,
-      allowedMethods: ['POST'],
-      receivedMethod: req.method
-    });
-  }
-  
-  next();
-});
-
 app.post('/api/contact', async (req, res) => {
   console.log('📧 Contact POST endpoint hit with method:', req.method);
   console.log('📧 Request body:', req.body);
