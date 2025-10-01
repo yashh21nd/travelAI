@@ -124,9 +124,23 @@ const ContactPage = () => {
         })
       });
       
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        // Handle non-200 responses
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+          const errorData = await response.text(); // Use text() instead of json() for error responses
+          errorMessage = errorData || errorMessage;
+        } catch (parseError) {
+          console.log('Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Parse JSON response only if response is ok
       const result = await response.json();
       
-      if (response.ok) {
+      if (result.success) {
         // Success
         toast.dismiss(loadingToast);
         toast.success('✅ Message sent successfully! We\'ll get back to you within 24 hours.', {
@@ -153,6 +167,12 @@ const ContactPage = () => {
       
     } catch (error) {
       console.error('Contact form error:', error);
+      console.log('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
       toast.dismiss(loadingToast);
       
       // Fallback to mailto if backend fails

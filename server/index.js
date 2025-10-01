@@ -2036,9 +2036,21 @@ app.get('/api/download-itinerary/:filename', (req, res) => {
 });
 
 // Contact form API endpoint
+app.get('/api/contact', (req, res) => {
+  res.json({ 
+    message: 'Contact API is working! Use POST method to submit contact form.',
+    timestamp: new Date().toISOString(),
+    methods: ['POST']
+  });
+});
+
 app.post('/api/contact', async (req, res) => {
+  console.log('📧 Contact endpoint hit with method:', req.method);
+  console.log('📧 Request body:', req.body);
+  console.log('📧 Request headers:', req.headers);
+  
   try {
-    const { name, email, subject, message } = req.body;
+    const { name, email, subject, message, inquiryType } = req.body;
     
     // Validate required fields
     if (!name || !email || !subject || !message) {
