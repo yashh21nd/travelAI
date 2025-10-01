@@ -205,7 +205,7 @@ const ContactPage = () => {
     {
       icon: Email,
       title: 'General Support',
-      primary: 'travelplanner.ai.service@gmail.com',
+      primary: 'help.travel.ai@gmail.com',
       secondary: 'All travel planning and support queries',
       color: brandColors.primary.main
     },
@@ -219,7 +219,7 @@ const ContactPage = () => {
     {
       icon: Business,
       title: 'Business Partnerships',
-      primary: 'travelplanner.ai.service@gmail.com',
+      primary: 'help.travel.ai@gmail.com',
       secondary: 'Affiliate and API partnerships',
       color: brandColors.accent.gold
     },

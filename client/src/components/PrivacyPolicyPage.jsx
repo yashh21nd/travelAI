@@ -232,9 +232,9 @@ const PrivacyPolicyPage = () => {
                     color: 'rgba(255,255,255,0.8)'
                   }
                 }}
-                onClick={() => window.location.href = 'mailto:travelplanner.ai.service@gmail.com'}
+                onClick={() => window.location.href = 'mailto:help.travel.ai@gmail.com'}
               >
-                travelplanner.ai.service@gmail.com
+                help.travel.ai@gmail.com
               </Typography>
             </Typography>
             <Typography variant="body1" sx={{ color: 'white', fontWeight: 500 }}>
@@ -266,9 +266,9 @@ const PrivacyPolicyPage = () => {
                     color: 'rgba(255,255,255,0.8)'
                   }
                 }}
-                onClick={() => window.location.href = 'mailto:travelplanner.ai.service@gmail.com'}
+                onClick={() => window.location.href = 'mailto:help.travel.ai@gmail.com'}
               >
-                travelplanner.ai.service@gmail.com
+                help.travel.ai@gmail.com
               </Typography>
             </Typography>
           </Stack>

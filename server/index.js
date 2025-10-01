@@ -1650,7 +1650,7 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
             <div class="footer-brand">
                 <h2>🌍 TravelAI Pro</h2>
                 <div class="footer-contact">
-                    📧 Contact: <a href="mailto:travelplanner.ai.service@gmail.com" class="contact-email">travelplanner.ai.service@gmail.com</a> | 
+                    📧 Contact: <a href="mailto:help.travel.ai@gmail.com" class="contact-email">help.travel.ai@gmail.com</a> | 
                     🌐 Professional AI-Powered Travel Solutions
                 </div>
             </div>
@@ -1666,7 +1666,7 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
                 </div>
                 <div class="terms-content">
                     For support, assistance, or custom itinerary modifications, please contact our team at 
-                    <a href="mailto:travelplanner.ai.service@gmail.com" class="contact-email">travelplanner.ai.service@gmail.com</a>. 
+                    <a href="mailto:help.travel.ai@gmail.com" class="contact-email">help.travel.ai@gmail.com</a>. 
                     We're committed to providing exceptional AI-powered travel planning experiences.
                 </div>
             </div>
@@ -2151,7 +2151,7 @@ app.post('/api/contact', async (req, res) => {
         <div style="background: #2E7D32; color: white; padding: 20px; text-align: center;">
           <p style="margin: 0 0 10px 0;"><strong>© 2025 TravelAI Pro</strong></p>
           <p style="margin: 0; font-size: 14px; opacity: 0.9;">Professional Travel Planning Made Easy</p>
-          <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.8;">📧 travelplanner.ai.service@gmail.com</p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.8;">📧 help.travel.ai@gmail.com</p>
         </div>
       </div>
     `;

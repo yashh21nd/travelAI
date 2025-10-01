@@ -109,7 +109,7 @@ const ProfessionalFooter = ({ onNavigate }) => {
             <Stack spacing={1} sx={{ mb: 3 }}>
               <Box 
                 component="button"
-                onClick={() => window.location.href = 'mailto:travelplanner.ai.service@gmail.com'}
+                onClick={() => window.location.href = 'mailto:help.travel.ai@gmail.com'}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
