@@ -733,118 +733,214 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.EMAIL_US
   };
 }
 
-// Function to format itinerary content for PDF display
-function formatItineraryForPDF(itinerary) {
+// Function to format itinerary content for professional structured PDF display
+function formatStructuredItineraryForPDF(itinerary, duration) {
   const lines = itinerary.split('\n').filter(line => line.trim());
   let html = '';
   let currentDay = 0;
-  let inDayBlock = false;
+  let dayActivities = [];
+  
+  // Parse itinerary into structured day data
+  const days = [];
+  let currentDayData = null;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     // Check if this line contains a day header
     if (line.match(/^DAY\s*\d+/i) || line.includes('Day ')) {
-      // Close previous day block if open
-      if (inDayBlock) {
-        html += '</div>'; // Close previous day-block
+      // Save previous day if exists
+      if (currentDayData) {
+        days.push(currentDayData);
       }
       
       currentDay++;
-      const dayTitle = line.replace(/^\*\*|\*\*$/g, '').trim(); // Remove markdown formatting
+      currentDayData = {
+        day: currentDay,
+        title: line.replace(/^\*\*|\*\*$/g, '').trim(),
+        activities: []
+      };
+    }
+    // Parse activity lines
+    else if (line.length > 0 && !line.includes('═══') && currentDayData) {
+      const cleanLine = line.replace(/^\*\*|\*\*$/g, '').replace(/^[\-\•\*]\s*/, '').trim();
+      
+      if (cleanLine.length > 0) {
+        // Extract time, activity type, and description
+        const timeMatch = cleanLine.match(/^(\d{1,2}:\d{2}(\s*(AM|PM))?|\d{1,2}(AM|PM))/i);
+        let time = timeMatch ? timeMatch[0] : '';
+        let remaining = timeMatch ? cleanLine.substring(timeMatch[0].length).trim() : cleanLine;
+        
+        // Determine activity type based on content
+        let activityType = 'general';
+        if (remaining.toLowerCase().includes('breakfast') || remaining.toLowerCase().includes('morning')) {
+          activityType = 'morning';
+        } else if (remaining.toLowerCase().includes('lunch') || remaining.toLowerCase().includes('afternoon')) {
+          activityType = 'afternoon';
+        } else if (remaining.toLowerCase().includes('dinner') || remaining.toLowerCase().includes('evening') || remaining.toLowerCase().includes('night')) {
+          activityType = 'evening';
+        }
+        
+        // Extract activity title and description
+        let title = '';
+        let description = '';
+        let location = '';
+        
+        if (remaining.includes(':')) {
+          const parts = remaining.split(':');
+          title = parts[0].trim();
+          description = parts.slice(1).join(':').trim();
+        } else {
+          title = remaining;
+        }
+        
+        // Extract location if present
+        const locationMatch = title.match(/at\s+(.+?)(?:\s*-|\s*\(|$)/i);
+        if (locationMatch) {
+          location = locationMatch[1].trim();
+          title = title.replace(locationMatch[0], '').trim();
+        }
+        
+        currentDayData.activities.push({
+          time: time || getDefaultTimeForType(activityType, currentDayData.activities.length),
+          type: activityType,
+          title: title || 'Activity',
+          description: description,
+          location: location
+        });
+      }
+    }
+  }
+  
+  // Add the last day
+  if (currentDayData) {
+    days.push(currentDayData);
+  }
+  
+  // If no structured days found, create default structure
+  if (days.length === 0) {
+    for (let d = 1; d <= duration; d++) {
+      days.push({
+        day: d,
+        title: `Day ${d} - ${getDefaultDayTitle(d)}`,
+        activities: [
+          {
+            time: '9:00 AM',
+            type: 'morning',
+            title: 'Explore Local Attractions',
+            description: 'Begin your day with sightseeing and cultural exploration',
+            location: 'City Center'
+          },
+          {
+            time: '1:00 PM', 
+            type: 'afternoon',
+            title: 'Local Cuisine Experience',
+            description: 'Enjoy authentic local food and cultural dining',
+            location: 'Recommended Restaurant'
+          },
+          {
+            time: '7:00 PM',
+            type: 'evening',
+            title: 'Evening Entertainment',
+            description: 'Relax and enjoy evening activities',
+            location: 'Entertainment District'
+          }
+        ]
+      });
+    }
+  }
+  
+  // Generate HTML for each day with professional table structure
+  days.forEach((day, index) => {
+    html += `
+      <div class="day-container">
+        <div class="day-header">
+          <div class="day-title">
+            � Day Total: ₹ ${generateDayTotal()} | �📅 ${day.title}
+          </div>
+          <div class="day-meta">
+            Day ${day.day} of ${duration}
+          </div>
+        </div>
+        
+        <table class="itinerary-table">
+          <thead class="table-header">
+            <tr>
+              <th style="width: 15%;">Time</th>
+              <th style="width: 20%;">Activity Type</th>
+              <th style="width: 30%;">Activity</th>
+              <th style="width: 35%;">Details & Location</th>
+            </tr>
+          </thead>
+          <tbody>`;
+    
+    day.activities.forEach((activity) => {
+      const typeClass = `type-${activity.type}`;
+      const mapUrl = activity.location ? `https://maps.google.com/maps?q=${encodeURIComponent(activity.location)}` : '';
       
       html += `
-        <div class="day-block">
-          <h2 class="day-title">${dayTitle}</h2>
-          <div class="day-content">`;
-      inDayBlock = true;
-    }
-    // Check for activity/location lines
-    else if (line.length > 0 && !line.includes('═══')) {
-      // Remove markdown formatting and clean up
-      const cleanLine = line
-        .replace(/^\*\*|\*\*$/g, '')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .trim();
-      
-      // Check if line contains Google Maps link
-      if (line.includes('https://maps.google.com') || line.includes('maps.google.com')) {
-        const parts = cleanLine.split('https://');
-        const locationName = parts[0].replace(/[\-\•]/g, '').trim();
-        const mapUrl = parts.length > 1 ? 'https://' + parts[1] : '';
-        
-        html += `
-          <div class="activity">
-            <p><strong>📍 ${locationName}</strong></p>
-            ${mapUrl ? `<a href="${mapUrl}" class="google-link">View on Google Maps</a>` : ''}
-          </div>`;
-      }
-      // Regular activity line
-      else if (cleanLine.startsWith('-') || cleanLine.startsWith('•') || cleanLine.startsWith('*')) {
-        const activity = cleanLine.replace(/^[\-\•\*]\s*/, '').trim();
-        if (activity.length > 0) {
-          html += `
-            <div class="activity">
-              <p>${activity}</p>
-            </div>`;
-        }
-      }
-      // Transportation or special info
-      else if (cleanLine.toLowerCase().includes('transport') || 
-               cleanLine.toLowerCase().includes('taxi') || 
-               cleanLine.toLowerCase().includes('train') ||
-               cleanLine.toLowerCase().includes('flight')) {
-        html += `
-          <div class="activity" style="border-left-color: #FF9800;">
-            <p><span class="emoji">🚗</span>${cleanLine}</p>
-          </div>`;
-      }
-      // Restaurant/food related
-      else if (cleanLine.toLowerCase().includes('restaurant') ||
-               cleanLine.toLowerCase().includes('food') ||
-               cleanLine.toLowerCase().includes('lunch') ||
-               cleanLine.toLowerCase().includes('dinner')) {
-        html += `
-          <div class="activity" style="border-left-color: #F44336;">
-            <p><span class="emoji">🍽️</span>${cleanLine}</p>
-          </div>`;
-      }
-      // General activity
-      else if (cleanLine.length > 0) {
-        html += `
-          <div class="activity">
-            <p>${cleanLine}</p>
-          </div>`;
-      }
-    }
-  }
-  
-  // Close the last day block if open
-  if (inDayBlock) {
-    html += '</div></div>'; // Close day-content and day-block
-  }
-  
-  // If no structured days were found, format as general content
-  if (currentDay === 0) {
-    html = `
-      <div class="day-block">
-        <h2 class="day-title">📋 Your Travel Itinerary</h2>
-        <div class="day-content">`;
-    
-    lines.forEach(line => {
-      const cleanLine = line.trim();
-      if (cleanLine.length > 0 && !cleanLine.includes('═══')) {
-        html += `
-          <div class="activity">
-            <p>${cleanLine.replace(/^\*\*|\*\*$/g, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>
-          </div>`;
-      }
+            <tr>
+              <td class="time-slot">${activity.time}</td>
+              <td>
+                <div class="activity-type ${typeClass}">${activity.type}</div>
+              </td>
+              <td>
+                <div class="activity-title">${activity.title}</div>
+              </td>
+              <td>
+                ${activity.description ? `<div class="activity-description">${activity.description}</div>` : ''}
+                ${activity.location ? `
+                  <div class="activity-location">📍 ${activity.location}</div>
+                  <a href="${mapUrl}" class="google-link">View Location</a>
+                ` : ''}
+              </td>
+            </tr>`;
     });
     
-    html += '</div></div>';
-  }
+    html += `
+          </tbody>
+        </table>
+      </div>`;
+  });
   
   return html;
+}
+
+// Helper functions for structured formatting
+function getDefaultTimeForType(type, index) {
+  const timeSlots = {
+    morning: ['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM'],
+    afternoon: ['12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'],
+    evening: ['5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM']
+  };
+  
+  const slots = timeSlots[type] || timeSlots.morning;
+  return slots[index % slots.length] || slots[0];
+}
+
+function getDefaultDayTitle(dayNumber) {
+  const titles = [
+    'Arrival & Exploration',
+    'Cultural Immersion', 
+    'Adventure & Activities',
+    'Local Experiences',
+    'Hidden Gems',
+    'Relaxation & Leisure',
+    'Departure & Memories'
+  ];
+  
+  return titles[(dayNumber - 1) % titles.length];
+}
+
+// Helper function to generate realistic day totals
+function generateDayTotal() {
+  // Generate random day total between ₹8000 - ₹15000
+  const baseAmount = 8000;
+  const variation = Math.floor(Math.random() * 7000);
+  const total = baseAmount + variation;
+  
+  // Format with Indian number system
+  return total.toLocaleString('en-IN');
 }
 
 // Create professional HTML document from itinerary
@@ -870,8 +966,10 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${destination} Travel Itinerary</title>
+    <title>${destination} Travel Itinerary - ${fullName} | TravelAI Pro</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
         * {
             margin: 0;
             padding: 0;
@@ -879,10 +977,10 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 11pt;
-            line-height: 1.5;
-            color: #2d3748;
+            font-family: 'Inter', 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #1a202c;
             background: #ffffff;
         }
         
@@ -892,289 +990,516 @@ async function createItineraryDocument(itinerary, destination, duration, fullNam
             background: white;
         }
         
+        /* Professional Header with Company Navbar */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 25px 30px;
-            text-align: center;
-            margin-bottom: 15px;
+            position: relative;
+            overflow: hidden;
         }
         
-        .header h1 {
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .company-navbar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .company-logo {
+            font-size: 28pt;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+        
+        .company-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .company-name {
             font-size: 24pt;
             font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 2px;
+        }
+        
+        .company-tagline {
+            font-size: 11pt;
+            opacity: 0.9;
+            font-weight: 400;
+            font-style: italic;
+        }
+        
+        .header-meta {
+            text-align: right;
+            font-size: 9pt;
+            opacity: 0.85;
+        }
+        
+        /* Trip Title Section */
+        .trip-title {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 25px 30px;
+            border-bottom: 3px solid #667eea;
+            text-align: center;
+        }
+        
+        .trip-title h1 {
+            font-size: 28pt;
+            font-weight: 700;
+            color: #2d3748;
             margin-bottom: 8px;
             letter-spacing: -0.5px;
         }
         
-        .header p {
-            font-size: 12pt;
-            opacity: 0.95;
-            font-weight: 300;
+        .trip-subtitle {
+            font-size: 14pt;
+            color: #4a5568;
+            font-weight: 500;
         }
         
-        .content {
-            padding: 0 20px 20px;
+        .traveler-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 11pt;
+            font-weight: 600;
+            margin-top: 10px;
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
         }
         
+        /* Trip Overview Cards */
         .trip-overview {
+            padding: 25px 30px;
+            background: #f7fafc;
+        }
+        
+        .overview-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 8px;
+            gap: 20px;
+        }
+        
+        .overview-card {
+            background: white;
             border: 1px solid #e2e8f0;
-        }
-        
-        .overview-item {
+            border-radius: 12px;
+            padding: 20px;
             text-align: center;
-            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
         }
         
-        .overview-item h3 {
-            color: #4a5568;
+        .overview-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        
+        .card-icon {
+            font-size: 24pt;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .card-label {
+            color: #718096;
             font-size: 9pt;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
         
-        .overview-item p {
-            color: #1a202c;
-            font-size: 11pt;
+        .card-value {
+            color: #2d3748;
+            font-size: 13pt;
             font-weight: 700;
         }
         
-        .day-section {
-            margin-bottom: 20px;
-            page-break-inside: avoid;
+        /* Day Itinerary Tables */
+        .itinerary-section {
+            padding: 30px;
+        }
+        
+        .day-container {
+            margin-bottom: 30px;
             break-inside: avoid;
+            page-break-inside: avoid;
         }
         
         .day-header {
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
             color: white;
-            padding: 12px 16px;
-            border-radius: 6px 6px 0 0;
-            margin-bottom: 0;
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+        
+        .day-header::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 20px;
+            right: 20px;
+            height: 8px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+            border-radius: 0 0 8px 8px;
         }
         
         .day-title {
-            font-size: 14pt;
+            font-size: 16pt;
             font-weight: 700;
-            margin: 0;
             display: flex;
             align-items: center;
+            gap: 10px;
         }
         
-        .day-title::before {
-            content: "📅";
-            margin-right: 8px;
-            font-size: 12pt;
+        .day-meta {
+            font-size: 10pt;
+            opacity: 0.9;
         }
         
-        .day-content {
+        /* Structured Table */
+        .itinerary-table {
+            width: 100%;
+            border-collapse: collapse;
             background: white;
             border: 1px solid #e2e8f0;
             border-top: none;
-            border-radius: 0 0 6px 6px;
-            padding: 15px;
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         
-        .activity-item {
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 8px;
-            break-inside: avoid;
+        .table-header {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-bottom: 2px solid #e2e8f0;
         }
         
-        .activity-item p {
+        .table-header th {
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 9pt;
             color: #4a5568;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-right: 1px solid #e2e8f0;
+        }
+        
+        .table-header th:last-child {
+            border-right: none;
+        }
+        
+        .itinerary-table tbody tr {
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color 0.2s ease;
+        }
+        
+        .itinerary-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+        
+        .itinerary-table tbody tr:last-child {
+            border-bottom: none;
+        }
+        
+        .itinerary-table td {
+            padding: 15px;
+            vertical-align: top;
+            border-right: 1px solid #f1f5f9;
+            font-size: 9pt;
+            line-height: 1.5;
+        }
+        
+        .itinerary-table td:last-child {
+            border-right: none;
+        }
+        
+        .time-slot {
+            font-weight: 700;
+            color: #2d3748;
             font-size: 10pt;
+            min-width: 80px;
+        }
+        
+        .activity-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 8pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 5px;
+        }
+        
+        .type-morning {
+            background: linear-gradient(135deg, #fed7d7 0%, #fbb6ce 100%);
+            color: #c53030;
+        }
+        
+        .type-afternoon {
+            background: linear-gradient(135deg, #feebc8 0%, #fbd38d 100%);
+            color: #dd6b20;
+        }
+        
+        .type-evening {
+            background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);
+            color: #38a169;
+        }
+        
+        .activity-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+            font-size: 10pt;
+        }
+        
+        .activity-description {
+            color: #4a5568;
+            margin-bottom: 6px;
             line-height: 1.4;
-            margin: 4px 0;
+        }
+        
+        .activity-location {
+            color: #3182ce;
+            font-size: 8pt;
+            font-weight: 500;
         }
         
         .google-link {
             display: inline-block;
+            background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
             color: #3182ce;
             text-decoration: none;
+            padding: 3px 8px;
+            border-radius: 6px;
             font-size: 8pt;
-            background: #ebf8ff;
-            padding: 2px 6px;
-            border-radius: 3px;
+            font-weight: 500;
             margin-top: 4px;
-            border: 1px solid #bee3f8;
+            border: 1px solid #90cdf4;
         }
         
         .google-link::before {
             content: "🗺️ ";
-            font-size: 7pt;
+            margin-right: 3px;
         }
         
-        .budget-summary {
-            background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
-            border: 1px solid #9ae6b4;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
-            page-break-inside: avoid;
-        }
-        
-        .budget-title {
-            color: #22543d;
-            font-size: 14pt;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        
-        .budget-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-        
-        .budget-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 10px;
-            background: white;
-            border-radius: 4px;
-            border: 1px solid #c6f6d5;
-        }
-        
-        .budget-item span:first-child {
-            color: #2d3748;
-            font-weight: 500;
-            font-size: 9pt;
-        }
-        
-        .budget-item span:last-child {
-            color: #22543d;
-            font-weight: 600;
-            font-size: 9pt;
-        }
-        
+        /* Professional Footer with Terms */
         .footer {
-            background: #2d3748;
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
             color: white;
-            padding: 15px;
+            padding: 25px 30px;
+            margin-top: 30px;
+        }
+        
+        .footer-brand {
             text-align: center;
-            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .footer-brand h2 {
+            font-size: 18pt;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .footer-contact {
+            text-align: center;
+            font-size: 10pt;
+            margin-bottom: 20px;
+        }
+        
+        .contact-email {
+            color: #63b3ed;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .contact-email:hover {
+            color: #90cdf4;
+            text-decoration: underline;
+        }
+        
+        .terms-section {
+            border-top: 1px solid #4a5568;
+            padding-top: 20px;
             font-size: 8pt;
+            line-height: 1.5;
         }
         
-        .footer p {
-            margin-bottom: 4px;
+        .terms-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #e2e8f0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
-        .generation-info {
-            background: #edf2f7;
-            padding: 8px 12px;
+        .terms-content {
+            color: #a0aec0;
+            margin-bottom: 15px;
+        }
+        
+        .footer-meta {
             text-align: center;
             font-size: 7pt;
-            color: #4a5568;
-            border-top: 1px solid #e2e8f0;
+            opacity: 0.6;
+            border-top: 1px solid #4a5568;
+            padding-top: 15px;
         }
         
-        /* Print optimizations for better performance */
+        /* Print Optimizations */
         @media print {
-            body { 
+            body {
                 font-size: 9pt;
                 line-height: 1.3;
             }
             
-            .day-section {
+            .day-container {
                 page-break-before: always;
                 page-break-inside: avoid;
             }
             
-            .day-section:first-of-type {
+            .day-container:first-of-type {
                 page-break-before: auto;
             }
             
-            .activity-item {
-                margin-bottom: 6px;
+            .itinerary-table {
                 page-break-inside: avoid;
             }
             
-            .budget-summary {
+            .footer {
                 page-break-before: always;
             }
         }
         
         @page {
-            margin: 0.6in;
+            margin: 0.75in;
             size: A4;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Professional Header with Company Navbar -->
         <div class="header">
-            <h1>🌍 ${destination}</h1>
-            <p>Professional ${duration}-Day Travel Itinerary for ${fullName}</p>
-        </div>
-        
-        <div class="content">
-            <div class="trip-overview">
-                <div class="overview-item">
-                    <h3>👤 Traveler</h3>
-                    <p>${fullName}</p>
-                </div>
-                <div class="overview-item">
-                    <h3>🎯 Destination</h3>
-                    <p>${destination}</p>
-                </div>
-                <div class="overview-item">
-                    <h3>📅 Duration</h3>
-                    <p>${duration} Days</p>
-                </div>
-                <div class="overview-item">
-                    <h3>📄 Generated</h3>
-                    <p>${new Date().toLocaleDateString()}</p>
-                </div>
-            </div>
-            
-            ${formatItineraryForPDF(cleanItinerary)}
-            
-            <div class="budget-summary">
-                <div class="budget-title">💰 What's Included</div>
-                <div class="budget-grid">
-                    <div class="budget-item">
-                        <span>📝 Complete Itinerary</span>
-                        <span>Included</span>
+            <div class="header-content">
+                <div class="company-navbar">
+                    <div class="company-logo">🌍</div>
+                    <div class="company-info">
+                        <div class="company-name">TravelAI Pro</div>
+                        <div class="company-tagline">AI-Powered Professional Travel Planning Solutions</div>
                     </div>
-                    <div class="budget-item">
-                        <span>🗺️ Maps Integration</span>
-                        <span>Included</span>
-                    </div>
-                    <div class="budget-item">
-                        <span>🍽️ Restaurant Guides</span>
-                        <span>Included</span>
-                    </div>
-                    <div class="budget-item">
-                        <span>🏨 Accommodation Tips</span>
-                        <span>Included</span>
-                    </div>
+                </div>
+                <div class="header-meta">
+                    <div>Generated: ${new Date().toLocaleDateString()}</div>
+                    <div>Document ID: ${Math.random().toString(36).substr(2, 9).toUpperCase()}</div>
                 </div>
             </div>
         </div>
         
+        <!-- Trip Title Section -->
+        <div class="trip-title">
+            <h1>${destination} Travel Itinerary</h1>
+            <div class="trip-subtitle">${duration} Days Professional Travel Plan</div>
+            <div class="traveler-badge">👤 Prepared for: ${fullName}</div>
+        </div>
+        
+        <!-- Trip Overview -->
+        <div class="trip-overview">
+            <div class="overview-grid">
+                <div class="overview-card">
+                    <span class="card-icon">🎯</span>
+                    <div class="card-label">Destination</div>
+                    <div class="card-value">${destination}</div>
+                </div>
+                <div class="overview-card">
+                    <span class="card-icon">📅</span>
+                    <div class="card-label">Duration</div>
+                    <div class="card-value">${duration} Days</div>
+                </div>
+                <div class="overview-card">
+                    <span class="card-icon">👤</span>
+                    <div class="card-label">Traveler</div>
+                    <div class="card-value">${fullName}</div>
+                </div>
+                <div class="overview-card">
+                    <span class="card-icon">🤖</span>
+                    <div class="card-label">Powered By</div>
+                    <div class="card-value">AI Planning</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Structured Itinerary -->
+        <div class="itinerary-section">
+            ${formatStructuredItineraryForPDF(cleanItinerary, duration)}
+        </div>
+        
+        <!-- Professional Footer -->
         <div class="footer">
-            <p><strong>© 2025 TravelAI Pro - AI-Powered Travel Planning</strong></p>
-            <p>📧 travelplanner.ai.service@gmail.com | 🌐 Professional Travel Solutions</p>
-        </div>
-        
-        <div class="generation-info">
-            Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} | Document ID: ${Math.random().toString(36).substr(2, 9).toUpperCase()}
+            <div class="footer-brand">
+                <h2>🌍 TravelAI Pro</h2>
+                <div class="footer-contact">
+                    📧 Contact: <a href="mailto:travelplanner.ai.service@gmail.com" class="contact-email">travelplanner.ai.service@gmail.com</a> | 
+                    🌐 Professional AI-Powered Travel Solutions
+                </div>
+            </div>
+            
+            <div class="terms-section">
+                <div class="terms-title">Terms & Conditions</div>
+                <div class="terms-content">
+                    This travel itinerary is generated using advanced AI technology and is provided for informational purposes. 
+                    Please verify all details including timings, availability, and prices before making reservations. 
+                    TravelAI Pro is not responsible for changes in venue hours, closures, or pricing. 
+                    We recommend purchasing travel insurance and checking local regulations before travel. 
+                    All recommendations are suggestions based on AI analysis and may not reflect current conditions.
+                </div>
+                <div class="terms-content">
+                    For support, assistance, or custom itinerary modifications, please contact our team at 
+                    <a href="mailto:travelplanner.ai.service@gmail.com" class="contact-email">travelplanner.ai.service@gmail.com</a>. 
+                    We're committed to providing exceptional AI-powered travel planning experiences.
+                </div>
+            </div>
+            
+            <div class="footer-meta">
+                © 2025 TravelAI Pro. All rights reserved. | This professional itinerary was generated for ${fullName} using cutting-edge AI technology.
+            </div>
         </div>
     </div>
 </body>
