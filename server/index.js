@@ -71,6 +71,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Test POST endpoint for frontend connectivity testing
+app.post('/api/test-post', (req, res) => {
+  console.log('🔍 Test POST endpoint hit');
+  res.json({
+    success: true,
+    message: 'Backend connectivity test successful',
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    body: req.body
+  });
+});
+
 // Root endpoint - Health check
 app.get('/', (req, res) => {
   res.json({
